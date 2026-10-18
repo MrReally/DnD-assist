@@ -8,6 +8,8 @@ import {
 	nextTurn,
 	previousTurn,
 	removeCombatant,
+	computeSlots,
+	slotOf,
 } from './combat';
 import { addCombatant } from './encounter';
 import { applyDamage, applyHealing, setTemporary } from './hp';
@@ -274,24 +276,26 @@ function reduce(s: AdventureState, a: Action, opts: ReducerOptions): void {
 		case 'encounter/set-group': {
 			const enc = s.activeEncounter;
 			if (!enc) throw new DomainError('Нет активного боя');
-			const oldGroups = new Set<string>();
+			// Remember members of the active and acted slots so turn state survives regrouping.
+			const before = computeSlots(enc);
+			const activeMembers = before.find((x) => x.id === enc.activeSlotId)?.memberIds ?? [];
+			const actedMembers = before.filter((x) => enc.actedThisRound.includes(x.id)).flatMap((x) => x.memberIds);
 			if (a.group) enc.groups[a.group.id] = structuredClone(a.group);
 			for (const id of a.combatantIds) {
 				const c = enc.combatants[id];
 				if (!c) throw new DomainError('Участник не найден');
-				if (c.initiativeGroupId) oldGroups.add(c.initiativeGroupId);
 				// Individual HP/effects remain untouched; only turn order membership changes.
 				c.initiativeGroupId = a.group?.id ?? null;
 			}
-			for (const g of oldGroups) {
-				if (!Object.values(enc.combatants).some((c) => c.initiativeGroupId === g)) {
-					if (enc.activeSlotId === g) {
-						const first = a.combatantIds[0];
-						enc.activeSlotId = a.group?.id ?? first ?? null;
-					}
-					delete enc.groups[g];
-				}
+			for (const g of Object.keys(enc.groups)) {
+				if (!Object.values(enc.combatants).some((c) => c.initiativeGroupId === g)) delete enc.groups[g];
 			}
+			const after = new Set(computeSlots(enc).map((x) => x.id));
+			if (enc.activeSlotId && !after.has(enc.activeSlotId)) {
+				const member = activeMembers.find((m) => enc.combatants[m]);
+				enc.activeSlotId = member ? slotOf(enc, member) : null;
+			}
+			enc.actedThisRound = [...new Set(actedMembers.map((m) => slotOf(enc, m)).filter((x): x is string => !!x && after.has(x)))];
 			return;
 		}
 		case 'encounter/update-group': {

@@ -10,7 +10,7 @@ import type { ReducerOptions } from './domain/reducer';
 import type { AdventureState, EffectTarget } from './domain/types';
 import { AdventureRegistry } from './services/adventure-registry';
 import { CanvasIndexService, type CanvasIndex } from './services/canvas-index';
-import { revertImportFiles } from './services/import-service';
+import { PC_FOLDER, revertImportFiles } from './services/import-service';
 import { NavigationHistory } from './services/navigation';
 import { AdventureStore, STATE_FILE, type DispatchOutcome } from './services/persistence';
 import type { CanvasAssistSettings, RegisteredAdventure } from './settings';
@@ -209,17 +209,25 @@ export class Controller {
 	}
 
 	/** Registers a root (explicit command) and creates its sidecar only if absent. */
-	async registerAdventure(rootPath: string, name: string): Promise<void> {
+	async registerAdventure(rootPath: string, name: string, opts: { fork?: boolean } = {}): Promise<void> {
 		const statePath = `${rootPath}/${STATE_FILE}`;
 		let adventureId: string;
 		if (await this.port.exists(statePath)) {
-			let parsed: { adventureId?: unknown } = {};
+			let parsed: Record<string, unknown> = {};
 			try {
-				parsed = JSON.parse(await this.port.read(statePath)) as typeof parsed;
+				parsed = JSON.parse(await this.port.read(statePath)) as Record<string, unknown>;
 			} catch {
 				parsed = {};
 			}
 			adventureId = typeof parsed.adventureId === 'string' && parsed.adventureId ? parsed.adventureId : newId('adv');
+			if (opts.fork) {
+				// Copied folder: keep its data, give it its own identity. The file is backed up first.
+				const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+				await this.port.copy(statePath, `${rootPath}/.canvas-assist-state.before-fork-${stamp}.json`);
+				adventureId = newId('adv');
+				const forked = { ...parsed, adventureId, rootPath, name, ...(typeof parsed.stateId === 'string' ? { stateId: newId('state') } : {}) };
+				await this.port.write(statePath, `${JSON.stringify(forked)}\n`);
+			}
 			await this.registry.register({ adventureId, rootPath, name });
 		} else {
 			adventureId = newId('adv');
@@ -265,8 +273,11 @@ export class Controller {
 		const out = await this.act({ type: 'history/undo' });
 		if (out.ok) {
 			new Notice(out.label, 2500);
-			if (entry?.files?.length) {
-				const notes = await revertImportFiles(this.port, entry.files);
+			if (entry?.files?.length && this.state) {
+				// Defence in depth: history comes from a file on disk; only touch this adventure's PC folder.
+				const prefix = `${this.state.rootPath}/${PC_FOLDER}/`;
+				const files = entry.files.filter((f) => f.path.startsWith(prefix) && !f.path.slice(prefix.length).split('/').includes('..'));
+				const notes = await revertImportFiles(this.port, files);
 				if (notes.length) new Notice(`Canvas Assist: ${notes.join('\n')}`, 10000);
 			}
 		}

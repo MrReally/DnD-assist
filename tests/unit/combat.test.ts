@@ -304,3 +304,21 @@ describe('AC-32 идемпотентность', () => {
 		expect(r.state).toBe(a);
 	});
 });
+
+describe('перегруппировка посреди хода', () => {
+	it('активный участник, объединённый в группу, получает свой конец хода', () => {
+		let s = withEncounter(baseState(), goblins(3, [15, 10, 5]));
+		s = run(s, { type: 'encounter/begin' });
+		s = run(s, { type: 'effect/add', effect: { id: 'e1', conditionId: null, label: 'Тест', target: { kind: 'combatant', id: 'g1' }, sourceCombatantId: null, sourceLabel: '', duration: { kind: 'turns', ownerCombatantId: 'g1', phase: 'end', remaining: 1 }, createdAtEventSeq: 0, isConcentration: false, concentrationEffectId: null, needsDecision: false, notes: '' } });
+		s = run(s, { type: 'encounter/set-group', combatantIds: ['g1', 'g3'], group: { id: 'grp', name: 'Г1+Г3', initiative: 15, tieOrder: 0 } });
+		expect(s.activeEncounter!.activeSlotId).toBe('grp');
+		s = run(s, { type: 'encounter/next' });
+		expect(s.effects.e1).toBeUndefined();
+		expect(activeName(s)).toBe('Гоблин 2');
+		s = run(s, { type: 'encounter/set-group', combatantIds: ['g1', 'g3'], group: null });
+		expect(s.activeEncounter!.groups).toEqual({});
+		expect(s.activeEncounter!.actedThisRound.sort()).toEqual(['g1', 'g3']);
+		s = run(s, { type: 'encounter/next' });
+		expect(s.activeEncounter!.round).toBe(2);
+	});
+});

@@ -225,7 +225,7 @@ describe('AC-36 переименование', () => {
 		let list: RegisteredAdventure[] = [{ adventureId: 'adv-A', rootPath: A, name: A }];
 		const reg = new AdventureRegistry(vault, () => list, async (l) => void (list = l));
 		vault.files.set(`Копия/${STATE_FILE}`, vault.files.get(`${A}/${STATE_FILE}`)!);
-		await expect(reg.register({ adventureId: 'adv-A', rootPath: 'Копия', name: 'Копия' })).rejects.toThrow(/тем же ID/);
+		await expect(reg.register({ adventureId: "adv-A", rootPath: "Копия", name: "Копия" })).rejects.toThrow(/тем же ID/);
 	});
 });
 

@@ -55,10 +55,12 @@ export function createSandbox(name, extraPlugins = []) {
 	return { root, vault, profile, configDir };
 }
 
+/** Installs the plugin like a user would: the three release files into <vault>/.obsidian/plugins/<id>. */
 export function installPlugin(vault) {
 	const dir = join(vault, '.obsidian', 'plugins', PLUGIN_ID);
 	mkdirSync(dir, { recursive: true });
-	for (const f of ['main.js', 'manifest.json', 'styles.css']) cpSync(join(REPO, f), join(dir, f));
+	const src = process.env.CA_E2E_FROM_RELEASE ? join(REPO, 'release') : REPO;
+	for (const f of ['main.js', 'manifest.json', 'styles.css']) cpSync(join(src, f), join(dir, f));
 }
 
 export class ObsidianApp {

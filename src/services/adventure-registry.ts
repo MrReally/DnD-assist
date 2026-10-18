@@ -5,6 +5,14 @@ import { isInside } from '../domain/normalize';
 import type { VaultPort } from '../adapters/vault-port';
 import { STATE_FILE } from './persistence';
 
+/** A copied adventure folder still carries the original adventureId. */
+export class DuplicateAdventureError extends Error {
+	constructor(readonly existingRoot: string) {
+		super(`Приключение с тем же ID уже зарегистрировано в «${existingRoot}». Похоже на копию папки — её можно сделать отдельным приключением с новым ID.`);
+		this.name = 'DuplicateAdventureError';
+	}
+}
+
 export const KNOWN_SUBFOLDERS = ['Холсты', 'Сюжет', 'Elements', 'Images', 'trash'];
 
 export interface RootCandidate {
@@ -70,9 +78,7 @@ export class AdventureRegistry {
 		if (err) throw new Error(err);
 		const others = this.list().filter((a) => a.adventureId !== entry.adventureId && a.rootPath !== entry.rootPath);
 		const dup = this.list().find((a) => a.adventureId === entry.adventureId && a.rootPath !== entry.rootPath);
-		if (dup && (await this.port.exists(`${dup.rootPath}/${STATE_FILE}`))) {
-			throw new Error(`Приключение с тем же ID уже зарегистрировано в «${dup.rootPath}». Скопированная папка? Создайте новое состояние.`);
-		}
+		if (dup && (await this.port.exists(`${dup.rootPath}/${STATE_FILE}`))) throw new DuplicateAdventureError(dup.rootPath);
 		await this.save([...others, entry]);
 	}
 

@@ -1,0 +1,42 @@
+{
+  "nextTurn": {
+    "p50": 2.263,
+    "p95": 3.645,
+    "serializeP95": 2.218,
+    "stateBytes": 363694,
+    "historyEntries": 100
+  },
+  "search": {
+    "100": {
+      "buildMs": 6.83,
+      "searchP50": 0.072,
+      "searchP95": 0.468
+    },
+    "500": {
+      "buildMs": 4.97,
+      "searchP50": 0.266,
+      "searchP95": 0.548
+    },
+    "2000": {
+      "buildMs": 24.7,
+      "searchP50": 1.572,
+      "searchP95": 2.424
+    }
+  },
+  "typicalState": {
+    "bytes": 115260,
+    "historyEntries": 100,
+    "historyBytes": 90673
+  },
+  "characters": {
+    "1": {
+      "damageAllMs": 0.15
+    },
+    "10": {
+      "damageAllMs": 0.99
+    },
+    "100": {
+      "damageAllMs": 67.53
+    }
+  }
+}

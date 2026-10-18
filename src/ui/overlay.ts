@@ -405,6 +405,12 @@ export class CanvasOverlay {
 		}
 		await this.ctl.refreshIndex();
 		if (this.destroyed) return;
+		// Canvas autosave while the user types in our search box: refresh results only, keep focus.
+		const search = el.querySelector<HTMLInputElement>('.ca-nav-search');
+		if (search && search === document.activeElement && this.navResults?.isConnected) {
+			this.renderNavResults();
+			return;
+		}
 		el.empty();
 		const head = el.createDiv({ cls: 'ca-nav-head' });
 		const input = head.createEl('input', { type: 'search', cls: 'ca-nav-search', attr: { placeholder: 'Поиск в холсте', 'aria-label': 'Поиск в текущем Canvas', 'data-testid': 'nav-search' } });

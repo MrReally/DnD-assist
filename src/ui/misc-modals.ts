@@ -1,7 +1,7 @@
 import { Modal, Setting, SuggestModal, type App } from 'obsidian';
 import { CATEGORY_LABELS, searchItems, type SearchHit } from '../domain/canvas-model';
 import type { Controller } from '../controller';
-import type { RootCandidate } from '../services/adventure-registry';
+import { DuplicateAdventureError, type RootCandidate } from '../services/adventure-registry';
 import { button } from './common';
 
 /** Explicit activation: "use the current Canvas as an adventure". Shows the verifiable root mapping. */
@@ -42,14 +42,18 @@ export class RegisterAdventureModal extends Modal {
 		if (v) err.setText(v);
 		const row = el.createDiv({ cls: 'ca-modal-buttons' });
 		button(row, 'Отмена', () => this.close());
-		button(row, `Подключить «${chosen}»`, () => void (async () => {
+		const submit = async (fork: boolean): Promise<void> => {
 			try {
-				await this.ctl.registerAdventure(chosen, name.trim() || chosen);
+				await this.ctl.registerAdventure(chosen, name.trim() || chosen, { fork });
 				this.close();
 			} catch (e) {
 				err.setText(e instanceof Error ? e.message : String(e));
+				if (e instanceof DuplicateAdventureError && !row.querySelector('[data-testid="reg-fork"]')) {
+					button(row, 'Сделать отдельным приключением (новый ID)', () => void submit(true), { cls: 'mod-warning', testId: 'reg-fork' });
+				}
 			}
-		})(), { cls: 'mod-cta', disabled: !!v || !chosen, testId: 'reg-submit' });
+		};
+		button(row, `Подключить «${chosen}»`, () => void submit(false), { cls: 'mod-cta', disabled: !!v || !chosen, testId: 'reg-submit' });
 	}
 
 	override onClose(): void {

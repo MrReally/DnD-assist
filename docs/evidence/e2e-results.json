@@ -1,0 +1,1019 @@
+{
+  "startedAt": "2026-10-18T03:03:16.073Z",
+  "durationSec": 169,
+  "summary": {
+    "INFO": 1,
+    "PASS": 55,
+    "NOT_RUN": 1
+  },
+  "results": [
+    {
+      "id": "ENV",
+      "title": "Окружение",
+      "status": "INFO",
+      "evidence": {
+        "pluginFrom": "release",
+        "pluginMainJsSha256": "0ffec34d3c217c9f79985afb059abc32107bc8bf8983fd86b6781c61bad64dd7",
+        "obsidian": "1.14.4",
+        "binary": "/opt/obs/squashfs-root/obsidian",
+        "os": "linux x64",
+        "node": "v22.22.0",
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.14.4 Chrome/150.0.7871.250 Electron/43.7.7 Safari/537.36"
+      }
+    },
+    {
+      "id": "BOOT",
+      "title": "Плагин загружается в реальном Obsidian",
+      "status": "PASS",
+      "ms": 509,
+      "evidence": {
+        "loaded": true,
+        "version": "1.0.0",
+        "restricted": false
+      }
+    },
+    {
+      "id": "AC-03+AC-43",
+      "title": "Подключение приключения А: миграция v1→v2 с резервной копией, без новых папок",
+      "status": "PASS",
+      "ms": 1718,
+      "evidence": {
+        "backup": ".canvas-assist-state.backup-v1-2026-10-18T03-03-22-117Z.json",
+        "characters": [
+          "adv-A-pc-alex"
+        ]
+      }
+    },
+    {
+      "id": "REG-B",
+      "title": "Подключение приключения Б (то же имя персонажа, другой ID)",
+      "status": "PASS",
+      "ms": 1704,
+      "evidence": {
+        "alex": {
+          "id": "adv-B-pc-alex",
+          "name": "Алекс",
+          "notePath": "Elements/Персонажи/Алекс.md",
+          "classes": [],
+          "hp": {
+            "current": 7,
+            "max": 12,
+            "temporary": 0
+          },
+          "ac": 13,
+          "initiativeModifier": null,
+          "speedFeet": null,
+          "spellSlots": {},
+          "hitDice": [],
+          "deathSaves": {
+            "successes": 0,
+            "failures": 0
+          },
+          "inspiration": false,
+          "exhaustion": 0,
+          "counters": {}
+        }
+      }
+    },
+    {
+      "id": "AC-01",
+      "title": "Изоляция A/B: урон Алексу в A не меняет ни байта в B; автопереключение",
+      "status": "PASS",
+      "ms": 11911,
+      "evidence": {
+        "aHp": 12,
+        "bHp": 7,
+        "bSha": "c2173ee742e40218ed265f3f5c007b0ac8f6775486160fc995cf0bcd6beda28a"
+      }
+    },
+    {
+      "id": "AC-02",
+      "title": "Несколько Canvas одного приключения: общее состояние, навигатор перестраивается",
+      "status": "PASS",
+      "ms": 3366,
+      "evidence": {
+        "nodes1": [
+          "node-02",
+          "node-01",
+          "group-01",
+          "group-loot",
+          "node-03"
+        ],
+        "nodes2": [
+          "node-04",
+          "node-05"
+        ]
+      }
+    },
+    {
+      "id": "AC-04",
+      "title": "Русский поиск: гоб / ГоБ / ё=е, частичные совпадения",
+      "status": "PASS",
+      "ms": 2465,
+      "evidence": {
+        "гоб": "n-gob",
+        "ГоБ": "n-gob",
+        "елкин": "n-star",
+        "шепот": "n-hb",
+        "таверна еж": "n-dup1"
+      }
+    },
+    {
+      "id": "AC-37",
+      "title": "Горячие клавиши не срабатывают при вводе текста",
+      "status": "PASS",
+      "ms": 359,
+      "evidence": {
+        "typed": "таверна ежD"
+      }
+    },
+    {
+      "id": "AC-06",
+      "title": "Навигация: фокус и выделение узла через проверенный Canvas Adapter",
+      "status": "PASS",
+      "ms": 812,
+      "evidence": {
+        "selection": [
+          "n-star"
+        ],
+        "centered": {
+          "cx": 500,
+          "cy": 115,
+          "tx": 500,
+          "ty": 115
+        }
+      }
+    },
+    {
+      "id": "AC-06-fallback",
+      "title": "Навигация при недоступном Canvas API: запасной путь не ломает Canvas",
+      "status": "PASS",
+      "ms": 1640,
+      "evidence": {
+        "tabsBefore": 0,
+        "tabsAfter": 1,
+        "canvasNodes": 15
+      }
+    },
+    {
+      "id": "AC-05",
+      "title": "Типизация: группа NPC → NPC; ручной override; Ignore исключается",
+      "status": "PASS",
+      "ms": 2451,
+      "evidence": {
+        "categories": {
+          "g-npc": "npc",
+          "g-loot": "loot",
+          "g-plot": "plot",
+          "g-hb": "homebrew",
+          "n-gob": "npc",
+          "n-star": "npc",
+          "n-missing": "npc",
+          "n-loot1": "loot",
+          "n-dup1": "plot",
+          "n-dup2": "plot",
+          "n-plot": "plot",
+          "n-hb": "homebrew",
+          "n-link": "notes",
+          "n-img": "notes",
+          "n-pc": "notes",
+          "n-future": "notes"
+        },
+        "override": {
+          "n-gob": "ignore"
+        }
+      }
+    },
+    {
+      "id": "AC-45-nav",
+      "title": "Ссылка на отсутствующую заметку помечена «источник недоступен»",
+      "status": "PASS",
+      "ms": 6,
+      "evidence": {
+        "className": "ca-nav-item is-missing"
+      }
+    },
+    {
+      "id": "AC-11",
+      "title": "Ошибочный JSON: сообщение с полем; ничего в хранилище не изменилось",
+      "status": "PASS",
+      "ms": 1876,
+      "evidence": {
+        "fatal": "Синтаксическая ошибка JSON: Expected double-quoted property name in JSON at position 69 (line 1 column 70)",
+        "errors": [
+          "$.name: имя обязательно",
+          "$.hitPoints.max: значение 0 вне диапазона 1…10000",
+          "$.hitPoints.current: значение -3 вне диапазона 0…10000"
+        ]
+      }
+    },
+    {
+      "id": "AC-08",
+      "title": "Импорт JSON создаёт Markdown в Elements/Персонажи со стабильным ID",
+      "status": "PASS",
+      "ms": 1234,
+      "evidence": {
+        "reason": "Заметка с таким именем уже есть, но не связана по ID. Выберите: обновить её или создать новую.",
+        "report": "ОтчётМира: создан — Elements/Персонажи/Мира 2.md",
+        "notePreview": "---\ncanvasAssistId: pc-mira-import\n---\n# Мира\n\n<!-- canvas-assist:begin -->\n> [!info] Лист персонажа (Canvas Assist)\n> Блок между служебными комментариями обновляется при повторном импорте JSON. Свои заметки пишите вне блока.\n> ID: `pc-mira"
+      }
+    },
+    {
+      "id": "AC-09",
+      "title": "Частичный лист: неизвестное остаётся пустым",
+      "status": "PASS",
+      "ms": 990,
+      "evidence": {
+        "character": {
+          "id": "pc-01a14cf730b73ec49bff3f",
+          "name": "Бор Неполный",
+          "notePath": "Elements/Персонажи/Бор Неполный.md",
+          "classes": [
+            {
+              "name": "Плут",
+              "level": 2
+            }
+          ],
+          "hp": {
+            "current": 0,
+            "max": null,
+            "temporary": 0
+          },
+          "ac": 14,
+          "initiativeModifier": null,
+          "speedFeet": null,
+          "spellSlots": {},
+          "hitDice": [],
+          "deathSaves": {
+            "successes": 0,
+            "failures": 0
+          },
+          "inspiration": false,
+          "exhaustion": 0,
+          "counters": {}
+        }
+      }
+    },
+    {
+      "id": "AC-10",
+      "title": "Повторный импорт (повышение уровня): максимум меняется, текущие HP и ячейки сохраняются",
+      "status": "PASS",
+      "ms": 1000,
+      "evidence": {
+        "diff": "Постоянные значения листа:Класс: Волшебник 3 → Волшебник 4Максимум хитов: 20 → 26Ячейки 2 ур. (максимум): 2 → 3Кости хитов d6 (всего): 3 → 4Текущие ресурсы (сохраняются без изменений):Текущие хиты: остаётся 9 (в JSON 26)Ячейки 1 ур. (текущие): остаётся 2 (в JSON 4)Ячейки 2 ур. (текущие): остаётся 2 (в JSON 3)Кости хитов d6 (осталось): остаётся 2 (в JSON 4)",
+        "hp": {
+          "current": 9,
+          "max": 26,
+          "temporary": 0
+        },
+        "slots": {
+          "1": {
+            "max": 4,
+            "current": 2
+          },
+          "2": {
+            "max": 3,
+            "current": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "AC-44-import",
+      "title": "HTML/JS из JSON не исполняется и не рендерится",
+      "status": "PASS",
+      "ms": 3726,
+      "evidence": {
+        "warnings": 4,
+        "file": "Хакер img src=x onerror=alert(1).md",
+        "dom": {
+          "scripts": 0,
+          "imgs": 0,
+          "bold": 0,
+          "text": "Хакер img src=x onerror=alert(1)Свойстваpc-01a14cf73885bcb8775123Добавить свойствоcanvasAssistId: pc-01a14cf73885bcb8775123Хакер <img src=x onerror=alert(1)>Лист персонажа (Canvas Assist)\nБлок между служебными комментариями обновляется при повторном импорте JSON. Свои заметки пишите вне блока.\nID: p",
+          "xss": 0
+        }
+      }
+    },
+    {
+      "id": "AC-12a",
+      "title": "Персональные ресурсы: временные хиты, ячейки, свободный счётчик сохраняются",
+      "status": "PASS",
+      "ms": 2063,
+      "evidence": {
+        "hp": {
+          "current": 9,
+          "max": 26,
+          "temporary": 3
+        },
+        "slot1": {
+          "current": 1,
+          "max": 4
+        },
+        "counter": {
+          "id": "ctr-01a14cf749e8f6434c588a",
+          "name": "Ки",
+          "current": 2,
+          "max": null,
+          "recovery": "manual"
+        }
+      }
+    },
+    {
+      "id": "AC-13",
+      "title": "Шаблон боя запускается дважды: новые ID, шаблон неизменен",
+      "status": "PASS",
+      "ms": 2707,
+      "evidence": {
+        "first": {
+          "enc": "enc-01a14cf7521b4206d3ef71",
+          "cmb": [
+            "cmb-01a14cf7521b1c203f7126",
+            "cmb-01a14cf7521b4654dd6f47",
+            "cmb-01a14cf7521b6d2d3d7ed5",
+            "cmb-01a14cf7521bd3e914ae91",
+            "cmb-01a14cf7521c6e1af61a0c",
+            "cmb-01a14cf7521c0494555b60",
+            "cmb-01a14cf7521cf72e76084a",
+            "cmb-01a14cf7521c97bec0e6de",
+            "cmb-01a14cf7521c54dc49b02f"
+          ]
+        },
+        "second": {
+          "enc": "enc-01a14cf75698fba0ea45de",
+          "cmb": [
+            "cmb-01a14cf7569808247bffc3",
+            "cmb-01a14cf756980006af0920",
+            "cmb-01a14cf75698429eda6c6c",
+            "cmb-01a14cf75698f97c2d8271",
+            "cmb-01a14cf7569841a7df44ee",
+            "cmb-01a14cf75698b2bed31615",
+            "cmb-01a14cf75698d935eb6a10",
+            "cmb-01a14cf756987b1d28a963",
+            "cmb-01a14cf75698e4bcac500a"
+          ]
+        }
+      }
+    },
+    {
+      "id": "AC-14",
+      "title": "Пять одинаковых монстров: номера и независимые HP",
+      "status": "PASS",
+      "ms": 21,
+      "evidence": {
+        "names": [
+          "Алекс",
+          "Мира",
+          "Бор Неполный",
+          "Хакер <img src=x onerror=alert(1)>",
+          "Гоблин 1",
+          "Гоблин 2",
+          "Гоблин 3",
+          "Гоблин 4",
+          "Гоблин 5"
+        ]
+      }
+    },
+    {
+      "id": "AC-15+AC-17",
+      "title": "Индивидуальная инициатива и стабильный порядок при равенстве",
+      "status": "PASS",
+      "ms": 4571,
+      "evidence": {
+        "order": [
+          "Гоблин 2",
+          "Гоблин 5",
+          "Алекс",
+          "Мира",
+          "Гоблин 3",
+          "Гоблин 4",
+          "Гоблин 1",
+          "Бор Неполный",
+          "Хакер <img src=x onerror=alert(1)>"
+        ],
+        "swapped": [
+          "Гоблин 2",
+          "Гоблин 5",
+          "Мира",
+          "Алекс",
+          "Гоблин 3",
+          "Гоблин 4",
+          "Гоблин 1",
+          "Бор Неполный",
+          "Хакер <img src=x onerror=alert(1)>"
+        ]
+      }
+    },
+    {
+      "id": "AC-16",
+      "title": "Общая инициатива группы: общий ход, раздельные HP",
+      "status": "PASS",
+      "ms": 1019,
+      "evidence": {
+        "group": [
+          "Гоблин 1",
+          "Гоблин 4"
+        ]
+      }
+    },
+    {
+      "id": "AC-18",
+      "title": "Раунд: после последнего «Next» +1 ровно один раз; «Previous» возвращает",
+      "status": "PASS",
+      "ms": 3287,
+      "evidence": {
+        "slots": 8,
+        "lastActive": "Хакер <img src=x onerror=alert(1)> (1)"
+      }
+    },
+    {
+      "id": "AC-19+AC-20",
+      "title": "Shift+D по выбранной цели не меняет активного; число вводится вручную",
+      "status": "PASS",
+      "ms": 863,
+      "evidence": {
+        "active": "Гоблин 2 (18)"
+      }
+    },
+    {
+      "id": "AC-21",
+      "title": "Нулевые HP: участник остаётся, эффект не исчезает",
+      "status": "PASS",
+      "ms": 1404,
+      "evidence": {
+        "hp": {
+          "current": 0,
+          "max": 7,
+          "temporary": 0
+        }
+      }
+    },
+    {
+      "id": "AC-22",
+      "title": "«3 конца собственных ходов» при наложении в чужой ход",
+      "status": "PASS",
+      "ms": 7523,
+      "evidence": {
+        "history": [
+          {
+            "end": 1,
+            "remaining": 2
+          },
+          {
+            "end": 2,
+            "remaining": 1
+          },
+          {
+            "end": 3,
+            "remaining": 0
+          }
+        ],
+        "effectId": "eff-01a14cf785fe01f8e622d5"
+      }
+    },
+    {
+      "id": "AC-25",
+      "title": "Undo возвращает истёкший эффект, Redo снова снимает",
+      "status": "PASS",
+      "ms": 693,
+      "evidence": {
+        "restored": {
+          "kind": "turns",
+          "ownerCombatantId": "cmb-01a14cf75698e4bcac500a",
+          "phase": "end",
+          "remaining": 1
+        }
+      }
+    },
+    {
+      "id": "AC-23",
+      "title": "«До начала следующего хода источника» — на turn-start источника",
+      "status": "PASS",
+      "ms": 3691,
+      "evidence": {
+        "source": "Мира",
+        "roundStartPassedBeforeSourceTurn": true
+      }
+    },
+    {
+      "id": "AC-24",
+      "title": "Два одинаковых состояния от разных источников: снятие одного не снимает второе",
+      "status": "PASS",
+      "ms": 1919,
+      "evidence": {
+        "pill": [
+          {
+            "text": "Испуганный ×2 · ∞, ∞",
+            "title": "Испуганный: Гоблин 2 (∞)\nИспуганный: Гоблин 5 (∞)"
+          }
+        ],
+        "remainingSource": "Гоблин 5"
+      }
+    },
+    {
+      "id": "AC-26",
+      "title": "Ручная правка эффекта (продление) не меняет историю других",
+      "status": "PASS",
+      "ms": 461,
+      "evidence": {
+        "duration": {
+          "kind": "rounds",
+          "phase": "end",
+          "remaining": 2
+        },
+        "kinds": [
+          "manual",
+          "turns",
+          "until-turn",
+          "rounds",
+          "game-time"
+        ]
+      }
+    },
+    {
+      "id": "AC-27",
+      "title": "Концентрация: связь эффект↔источник; снятие без проверки правил",
+      "status": "PASS",
+      "ms": 2444,
+      "evidence": {
+        "concentration": "Концентрация: Удержание личности",
+        "linked": "Парализованный"
+      }
+    },
+    {
+      "id": "AC-07",
+      "title": "TTG: sourceUrl открывает правильный справочник; локальные параметры без сети",
+      "status": "PASS",
+      "ms": 998,
+      "evidence": {
+        "opened": [
+          "https://5e14.ttg.club/bestiary/goblin"
+        ],
+        "stats": [
+          "Хиты7/7",
+          "КД—",
+          "Иниц.3"
+        ]
+      }
+    },
+    {
+      "id": "AC-38",
+      "title": "Сложный Canvas: файлы .canvas не изменены плагином (неизвестные поля целы)",
+      "status": "PASS",
+      "ms": 10,
+      "evidence": {
+        "pluginCanvasWrites": 0,
+        "pluginStateWrites": 93,
+        "obsidianOwnCanvasRewrites": [
+          "Приключение А/Холсты/01.canvas",
+          "Приключение Б/Холсты/01.canvas",
+          "Приключение Б/Холсты/02.canvas",
+          "Приключение А/Холсты/02.canvas",
+          "Приключение А/Холсты/03 сложный, тест — ё.canvas"
+        ],
+        "filesReformattedByObsidian": 5
+      }
+    },
+    {
+      "id": "AC-37b",
+      "title": "Редактирование текстового узла Canvas: Shift+Space и Shift+F не меняют бой",
+      "status": "PASS",
+      "ms": 4782,
+      "evidence": {
+        "editing": {
+          "isEditing": true,
+          "focus": "IFRAME",
+          "inNode": true
+        }
+      }
+    },
+    {
+      "id": "AC-30",
+      "title": "Переключение партии: бой не переписывается молча",
+      "status": "PASS",
+      "ms": 870,
+      "evidence": {
+        "parties": [
+          "Без партии",
+          "Основная",
+          "Партия 2"
+        ]
+      }
+    },
+    {
+      "id": "AC-32",
+      "title": "Повтор actionId не удваивает урон и не увеличивает раунд (реальное хранилище)",
+      "status": "PASS",
+      "ms": 50,
+      "evidence": {
+        "hp0": 7,
+        "hp": 6,
+        "a": true,
+        "bDup": true,
+        "n1": true,
+        "n2dup": true,
+        "sameSlot": true,
+        "round0": 5,
+        "r1": 5,
+        "r2": 5
+      }
+    },
+    {
+      "id": "AC-31",
+      "title": "Аварийное завершение после подтверждённого действия → всё восстановлено",
+      "status": "PASS",
+      "ms": 2787,
+      "evidence": {
+        "round": 5,
+        "history": 81,
+        "revision": 96
+      }
+    },
+    {
+      "id": "AC-12b",
+      "title": "Ресурсы отображаются после перезапуска",
+      "status": "PASS",
+      "ms": 399,
+      "evidence": {
+        "temp": "3"
+      }
+    },
+    {
+      "id": "UNDO-AFTER-RESTART",
+      "title": "Undo/Redo после перезапуска",
+      "status": "PASS",
+      "ms": 747,
+      "evidence": {
+        "label": "Следующий ход"
+      }
+    },
+    {
+      "id": "AC-33",
+      "title": "Сбой записи: нет ложного «сохранено»",
+      "status": "PASS",
+      "ms": 418,
+      "evidence": {
+        "ok": false,
+        "error": "Не сохранено: EIO: simulated disk failure",
+        "label": "НЕ сохранено",
+        "hp0": 7,
+        "hp1": 7
+      }
+    },
+    {
+      "id": "AC-35",
+      "title": "Конкурентная запись: внешнее изменение → конфликт версий, без тихой перезаписи",
+      "status": "PASS",
+      "ms": 1188,
+      "evidence": {
+        "localCopy": "Приключение А/.canvas-assist-state.conflict-local-2026-10-18T03-04-39-657Z.json"
+      }
+    },
+    {
+      "id": "AC-34",
+      "title": "Повреждённый JSON: режим только чтения, оригинал сохранён, понятное сообщение",
+      "status": "PASS",
+      "ms": 1831,
+      "evidence": {
+        "message": "Файл состояния повреждён (некорректный JSON: Expected double-quoted property name in JSON at position 45 (line 1 column 46)). Работа в режиме только чтения. Оригинал не изменён, копия: Приключение Б/.canvas-assist-state.corrupt-2026-10-18T03-04-40-893Z.json.",
+        "chip": "Только чтение"
+      }
+    },
+    {
+      "id": "AC-45",
+      "title": "Удаление оригинала: «источник недоступен», бой восстановим",
+      "status": "PASS",
+      "ms": 3308,
+      "evidence": {
+        "warn": "лист недоступен"
+      }
+    },
+    {
+      "id": "AC-36",
+      "title": "Переименование корня приключения и заметки: пути обновлены, новый PC не создан",
+      "status": "PASS",
+      "ms": 4988,
+      "evidence": {
+        "registry": [
+          {
+            "adventureId": "adv-A",
+            "rootPath": "Приключение А (переим.)",
+            "name": "Приключение А (переим.)"
+          },
+          {
+            "adventureId": "adv-B",
+            "rootPath": "Приключение Б",
+            "name": "Приключение Б"
+          }
+        ]
+      }
+    },
+    {
+      "id": "AC-28+AC-29",
+      "title": "Выборочный долгий отдых; ручной счётчик не восстанавливается",
+      "status": "PASS",
+      "ms": 2249,
+      "evidence": {
+        "preview": "Предпросмотр: до → послеМираХиты: 9 → 26Ячейки 1 ур.: 1 → 4Ячейки 2 ур.: 2 → 3Кости хитов d6: 2 → 4"
+      }
+    },
+    {
+      "id": "AC-41",
+      "title": "Светлая/тёмная темы, маленькое окно: читаемость и отсутствие обрезания",
+      "status": "PASS",
+      "ms": 5620,
+      "evidence": {
+        "moonstone": {
+          "minContrast": 6.04,
+          "worst": [
+            {
+              "r": 6.041230482584354,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.679608 0.17451 0.234902)",
+              "bg": "rgb(246, 246, 246)"
+            },
+            {
+              "r": 6.041230482584354,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.679608 0.17451 0.234902)",
+              "bg": "rgb(246, 246, 246)"
+            },
+            {
+              "r": 6.187508957912799,
+              "cls": "ca-chip-hp",
+              "text": "♥ 12/28",
+              "color": "rgb(92, 92, 92)",
+              "bg": "rgb(246, 246, 246)"
+            }
+          ],
+          "checked": 38,
+          "clipped": [],
+          "smallButtons": 0,
+          "buttons": 33,
+          "dark": false
+        },
+        "moonstone-small": {
+          "minContrast": 6.04,
+          "worst": [
+            {
+              "r": 6.041230482584354,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.679608 0.17451 0.234902)",
+              "bg": "rgb(246, 246, 246)"
+            },
+            {
+              "r": 6.041230482584354,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.679608 0.17451 0.234902)",
+              "bg": "rgb(246, 246, 246)"
+            },
+            {
+              "r": 6.187508957912799,
+              "cls": "ca-chip-hp",
+              "text": "♥ 12/28",
+              "color": "rgb(92, 92, 92)",
+              "bg": "rgb(246, 246, 246)"
+            }
+          ],
+          "checked": 33,
+          "clipped": [],
+          "smallButtons": 0,
+          "buttons": 33,
+          "dark": false
+        },
+        "obsidian": {
+          "minContrast": 5.22,
+          "worst": [
+            {
+              "r": 5.218511943790661,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.94549 0.448627 0.465098)",
+              "bg": "rgb(40, 40, 40)"
+            },
+            {
+              "r": 5.218511943790661,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.94549 0.448627 0.465098)",
+              "bg": "rgb(40, 40, 40)"
+            },
+            {
+              "r": 7.031630742891614,
+              "cls": "ca-chip-hp",
+              "text": "♥ 12/28",
+              "color": "rgb(179, 179, 179)",
+              "bg": "rgb(40, 40, 40)"
+            }
+          ],
+          "checked": 38,
+          "clipped": [],
+          "smallButtons": 0,
+          "buttons": 33,
+          "dark": true
+        },
+        "obsidian-small": {
+          "minContrast": 5.22,
+          "worst": [
+            {
+              "r": 5.218511943790661,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.94549 0.448627 0.465098)",
+              "bg": "rgb(40, 40, 40)"
+            },
+            {
+              "r": 5.218511943790661,
+              "cls": "ca-chip-hp ca-zero",
+              "text": "♥ 0/?",
+              "color": "color(srgb 0.94549 0.448627 0.465098)",
+              "bg": "rgb(40, 40, 40)"
+            },
+            {
+              "r": 7.031630742891614,
+              "cls": "ca-chip-hp",
+              "text": "♥ 12/28",
+              "color": "rgb(179, 179, 179)",
+              "bg": "rgb(40, 40, 40)"
+            }
+          ],
+          "checked": 33,
+          "clipped": [],
+          "smallButtons": 0,
+          "buttons": 33,
+          "dark": true
+        }
+      }
+    },
+    {
+      "id": "AC-42",
+      "title": "Нет утечек: 100 открытий/закрытий панелей",
+      "status": "PASS",
+      "ms": 11300,
+      "evidence": {
+        "before": {
+          "dom": 963,
+          "listeners": 1
+        },
+        "afterPanelsAndNav": {
+          "dom": 965,
+          "listeners": 1
+        },
+        "after": {
+          "dom": 963,
+          "listeners": 1,
+          "modals": 0
+        }
+      }
+    },
+    {
+      "id": "PERF",
+      "title": "Производительность в реальном приложении",
+      "status": "PASS",
+      "ms": 18635,
+      "evidence": {
+        "searchP50": 0.2,
+        "searchP95": 0.8,
+        "nextTurnWithWriteP50": 33.4,
+        "nextTurnWithWriteP95": 38.3,
+        "cloneP95": 2.2,
+        "stateBytes": 208310,
+        "historyBytes": 81350,
+        "idle": {
+          "taskSecondsPer10s": 0,
+          "scriptSeconds": 0,
+          "cpuPercentOfOneCore": 0,
+          "networkRequestsInIdle": 0,
+          "heapMiB": 53.8
+        }
+      }
+    },
+    {
+      "id": "MEM",
+      "title": "Дополнительная память плагина (heap с плагином / без)",
+      "status": "PASS",
+      "ms": 4451,
+      "evidence": {
+        "withPluginMiB": 23.6,
+        "withoutMiB": 21.6,
+        "deltaMiB": 2
+      }
+    },
+    {
+      "id": "AC-39",
+      "title": "Выключение плагина: Canvas и Markdown читаются штатно",
+      "status": "PASS",
+      "ms": 3719,
+      "evidence": {
+        "overlays": 0,
+        "nodes": 5,
+        "md": "markdown"
+      }
+    },
+    {
+      "id": "TWO-TABS",
+      "title": "Два Canvas одного приключения в разных вкладках: общее состояние без конфликтов",
+      "status": "PASS",
+      "ms": 2839,
+      "evidence": {
+        "roundBefore": 1,
+        "roundAfter": 1,
+        "shown": "Массовка 15 (85)",
+        "overlays": {
+          "total": 2,
+          "active": 1
+        }
+      }
+    },
+    {
+      "id": "CONSOLE",
+      "title": "Нет ошибок плагина в консоли за всю сессию",
+      "status": "PASS",
+      "ms": 0,
+      "evidence": {
+        "consoleMessages": 0
+      }
+    },
+    {
+      "id": "RENAME-CLOSED",
+      "title": "Переименование корня при закрытом Obsidian: безопасное переподключение по adventureId",
+      "status": "PASS",
+      "ms": 1996,
+      "evidence": {
+        "registry": [
+          {
+            "adventureId": "adv-A",
+            "rootPath": "Приключение А",
+            "name": "Приключение А"
+          },
+          {
+            "adventureId": "adv-B",
+            "rootPath": "Приключение Б (диск)",
+            "name": "Приключение Б (диск)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "COPY-FORK",
+      "title": "Копия папки приключения с тем же ID: не смешивается, явное разделение",
+      "status": "PASS",
+      "ms": 2966,
+      "evidence": {
+        "forkedId": "adv-01a14cf8ec3249c7c52ff5",
+        "characters": 4
+      }
+    },
+    {
+      "id": "AC-40",
+      "title": "Офлайн: старт и бой без сети/TTG/сторонних плагинов",
+      "status": "PASS",
+      "ms": 4917,
+      "evidence": {
+        "stats": [
+          "Хиты4/7",
+          "КД15",
+          "Иниц.—"
+        ],
+        "pluginHttpCalls": 0,
+        "obsidianOwnRequests": [
+          "https://5e14.ttg.club/"
+        ],
+        "ttgRequestsByCanvasLinkEmbed": [
+          {
+            "url": "https://5e14.ttg.club/",
+            "initiator": "script"
+          }
+        ]
+      }
+    },
+    {
+      "id": "COMPAT-FSB",
+      "title": "Совместимость: реальный Fantasy Statblocks 4.10.3 + адаптер под флагом",
+      "status": "PASS",
+      "ms": 4750,
+      "evidence": {
+        "fsb": {
+          "version": "4.10.3",
+          "resolved": true,
+          "goblin": true
+        },
+        "prefilled": {
+          "hp": "7",
+          "ac": "15"
+        },
+        "card": "Fantasy Statblocks: КД 15, хиты 7, скорость 30 ft.УронЛечениеВрем. хитыЭффектВременный КД в боюПусто — КД листа/карточки"
+      }
+    },
+    {
+      "id": "MOBILE",
+      "title": "Мобильный E2E (iOS/Android)",
+      "status": "NOT_RUN",
+      "reason": "Нет эмулятора Android/iOS с Obsidian в окружении. Выполнена статическая проверка отсутствия Node/Electron импортов (scripts/check-bundle.mjs)."
+    }
+  ]
+}

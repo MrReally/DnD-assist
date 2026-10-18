@@ -24,8 +24,11 @@ export default class CanvasAssistPlugin extends Plugin {
 			saveSettings: () => this.saveSettings(),
 			httpPost: async (url, body, timeoutMs) => {
 				const req = requestUrl({ url, method: 'POST', body, contentType: 'application/json', throw: false });
-				const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('timeout')), timeoutMs));
-				const res = await Promise.race([req, timeout]);
+				let timer = 0;
+				const timeout = new Promise<never>((_, reject) => {
+					timer = window.setTimeout(() => reject(new Error('timeout')), timeoutMs);
+				});
+				const res = await Promise.race([req, timeout]).finally(() => window.clearTimeout(timer));
 				let json: unknown = null;
 				try {
 					json = res.json as unknown;

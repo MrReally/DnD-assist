@@ -3,7 +3,7 @@
 // over CDP inside an isolated temporary vault/profile. Results: tests/e2e/out/results.json + .md.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createSandbox, launchTrusted, obsidianBinary, ObsidianApp, OUT, PLUGIN_ID, REPO, sleep } from './lib.mjs';
 
@@ -252,7 +252,8 @@ async function main() {
 	const canvasHashesBefore = listTree(sb.vault).filter((l) => l.endsWith('.canvas')).map((l) => `${l} ${sha(join(sb.vault, l.slice(2)))}`);
 	app = await launchTrusted(sb);
 	const obsVersion = await app.eval(() => window.electron?.ipcRenderer?.sendSync?.('version') ?? navigator.userAgent);
-	results.push({ id: 'ENV', title: 'Окружение', status: 'INFO', evidence: { obsidian: obsVersion, binary: bin, os: `${process.platform} ${process.arch}`, node: process.version, userAgent: await app.eval(() => navigator.userAgent) } });
+	const pluginSrc = process.env.CA_E2E_FROM_RELEASE ? join(REPO, 'release') : REPO;
+	results.push({ id: 'ENV', title: 'Окружение', status: 'INFO', evidence: { pluginFrom: relative(REPO, pluginSrc) || '.', pluginMainJsSha256: sha(join(pluginSrc, 'main.js')), obsidian: obsVersion, binary: bin, os: `${process.platform} ${process.arch}`, node: process.version, userAgent: await app.eval(() => navigator.userAgent) } });
 
 	await step('BOOT', 'Плагин загружается в реальном Obsidian', async () => {
 		const r = await app.enablePlugin();
@@ -1440,16 +1441,34 @@ async function main() {
 
 	await step('RENAME-CLOSED', 'Переименование корня при закрытом Obsidian: безопасное переподключение по adventureId', async () => {
 		renameSync(join(sb.vault, B), join(sb.vault, 'Приключение Б (диск)'));
+		cpSync(join(sb.vault, A), join(sb.vault, 'Приключение А — копия'), { recursive: true });
 		app = await new ObsidianApp(sb).launch();
 		await app.enablePlugin();
 		await openCanvas('Приключение Б (диск)/Холсты/01.canvas');
 		await waitFor(async () => (await state())?.adventureId === 'adv-B', 'relinked adventure B');
 		const reg = JSON.parse(readFileSync(join(sb.vault, '.obsidian', 'plugins', PLUGIN_ID, 'data.json'), 'utf8')).adventures;
 		assert(reg.filter((a) => a.adventureId === 'adv-B').length === 1 && reg.find((a) => a.adventureId === 'adv-B').rootPath === 'Приключение Б (диск)', JSON.stringify(reg));
+		return { registry: reg };
+	});
+
+	await step('COPY-FORK', 'Копия папки приключения с тем же ID: не смешивается, явное разделение', async () => {
+		const aBefore = sha(stateFile(A));
+		await openCanvas('Приключение А — копия/Холсты/01.canvas');
+		const ctx = await app.eval(() => ({ adv: window.canvasAssist.ctl.activeAdventureId, hint: window.canvasAssist.ctl.unregisteredHint }));
+		assert(ctx.adv === null, `copy must not silently map to adventure A (${JSON.stringify(ctx)})`);
+		await click(tid('bar-register'));
+		await click(tid('reg-submit'));
+		await waitFor(() => page().locator(tid('reg-fork')).count(), 'fork offered');
+		await click(tid('reg-fork'));
+		await waitFor(async () => (await state())?.rootPath === 'Приключение А — копия', 'forked adventure active');
+		const s = await state();
+		assert(s.adventureId !== 'adv-A', 'new adventureId');
+		assert(sha(stateFile(A)) === aBefore, 'original A untouched');
+		assert(readdirSync(join(sb.vault, 'Приключение А — копия')).some((f) => f.startsWith('.canvas-assist-state.before-fork-')), 'backup before fork');
 		const errs = app.pluginErrors();
 		assert(errs.length === 0, JSON.stringify(errs));
 		await app.close();
-		return { registry: reg };
+		return { forkedId: s.adventureId, characters: Object.keys(s.characters).length };
 	});
 
 	// ---------------- Offline session ----------------
