@@ -43,6 +43,7 @@ export function emptyCharacter(id: string, name: string, notePath: string): Char
 	};
 }
 
+/** Compact JSON (the sidecar is machine data; Markdown notes stay the human-readable part). */
 export function serializeState(state: AdventureState): string {
-	return `${JSON.stringify(state, null, '\t')}\n`;
+	return `${JSON.stringify(state)}\n`;
 }

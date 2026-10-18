@@ -1,10 +1,12 @@
-import { Modal, Setting, TFile } from 'obsidian';
+import { Modal, Notice, Setting, TFile } from 'obsidian';
 import { buildMonsters, emptyEncounter, pcCombatant, type MonsterSpec } from '../domain/encounter';
 import { nextTieOrder } from '../domain/combat';
 import { newId } from '../domain/ids';
 import { relativeTo } from '../domain/normalize';
 import type { CreatureCard, EncounterTemplate, EncounterTemplateEntry } from '../domain/types';
 import { safeTtgUrl } from '../adapters/ttg-adapter';
+import { statblockSummary } from '../adapters/statblock-adapter';
+import { normalizeText } from '../domain/normalize';
 import type { Controller } from '../controller';
 import { button, intOrNull } from './common';
 
@@ -106,7 +108,10 @@ export class TemplateModal extends Modal {
 					this.render();
 				});
 			});
-			row3.addText((t) => t.setPlaceholder('ссылка TTG').setValue(e.sourceUrl ?? '').onChange((v) => (e.sourceUrl = safeTtgUrl(v.trim()))));
+			row3.addText((t) => {
+				t.setPlaceholder('ссылка TTG').setValue(e.sourceUrl ?? '').onChange((v) => (e.sourceUrl = safeTtgUrl(v.trim())));
+				t.inputEl.dataset.testid = `tpl-entry-url-${i}`;
+			});
 			button(box, 'Убрать', () => {
 				this.t.entries.splice(i, 1);
 				this.render();
@@ -205,6 +210,10 @@ export class AddCombatantModal extends Modal {
 			t.inputEl.dataset.testid = 'add-name';
 		});
 		numberField(row, this.spec.count, 'кол-во', (v) => (this.spec.count = v ?? 1), 'add-count');
+		row.addButton((b) => {
+			b.setButtonText('Подставить из справочника').setTooltip('Карточки существ → локальный JSON-справочник → Fantasy Statblocks (если включён)').onClick(() => void this.fillFromReferences());
+			b.buttonEl.dataset.testid = 'add-lookup';
+		});
 		const row2 = new Setting(el).setName('Хиты / КД / мод. иниц.');
 		numberField(row2, this.spec.hpMax, 'хиты', (v) => (this.spec.hpMax = v), 'add-hp');
 		numberField(row2, this.spec.ac, 'КД', (v) => (this.spec.ac = v), 'add-ac');
@@ -220,6 +229,38 @@ export class AddCombatantModal extends Modal {
 		const buttons = el.createDiv({ cls: 'ca-modal-buttons' });
 		button(buttons, 'Отмена', () => this.close());
 		button(buttons, 'Добавить', () => void this.submit(err), { cls: 'mod-cta', testId: 'add-submit' });
+	}
+
+	/** Fills empty fields only; never overwrites what the GM typed. */
+	private async fillFromReferences(): Promise<void> {
+		const s = this.ctl.state;
+		const name = this.spec.name.trim();
+		if (!s || !name) return;
+		const q = normalizeText(name, { foldYo: true });
+		const card = Object.values(s.creatures).find((c) => [c.name, ...c.aliases].some((n) => normalizeText(n, { foldYo: true }) === q));
+		let found: { hpMax: number | null; ac: number | null; initiativeModifier: number | null; url: string | null; from: string } | null = null;
+		if (card) {
+			found = { hpMax: card.hpMax, ac: card.ac, initiativeModifier: card.initiativeModifier, url: card.source?.url ?? null, from: 'карточка' };
+			this.spec.creatureId = card.id;
+		} else {
+			const hit = (await this.ctl.offline.search(name)).find((h) => normalizeText(h.name, { foldYo: true }) === q);
+			const sum = hit ? await this.ctl.offline.getSummary(hit.ref) : null;
+			if (sum) found = { hpMax: sum.hpMax, ac: sum.ac, initiativeModifier: sum.initiativeModifier, url: sum.sourceUrl, from: 'локальный справочник' };
+			else {
+				const sb = statblockSummary(this.app, this.ctl.settings.fantasyStatblocks, name);
+				if (sb) found = { hpMax: sb.hpMax, ac: sb.ac, initiativeModifier: sb.initiativeModifier, url: null, from: 'Fantasy Statblocks' };
+			}
+		}
+		if (!found) {
+			new Notice(`«${name}» не найдено в карточках и подключённых справочниках`);
+			return;
+		}
+		this.spec.hpMax ??= found.hpMax;
+		this.spec.ac ??= found.ac;
+		this.spec.initiativeModifier ??= found.initiativeModifier;
+		if (found.url && !this.spec.source) this.spec.source = { provider: 'ttg2014', ref: found.url, url: found.url };
+		new Notice(`Подставлено: ${found.from}`);
+		this.render();
 	}
 
 	private async submit(err: HTMLElement): Promise<void> {

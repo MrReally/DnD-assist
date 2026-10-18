@@ -30,12 +30,20 @@ export function matchesHotkey(ev: Pick<KeyboardEvent, 'code' | 'shiftKey' | 'alt
 	return ev.code === hk.code && ev.shiftKey === hk.shift && ev.altKey === hk.alt && (ev.ctrlKey || ev.metaKey) === hk.mod;
 }
 
-/** True when the event target is any kind of text input (incl. Canvas node editors). */
-export function isTypingTarget(target: EventTarget | null): boolean {
-	if (!target || typeof (target as Element).closest !== 'function') return false;
-	const el = target as HTMLElement;
-	if (el.isContentEditable) return true;
-	return !!el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .cm-editor, .markdown-source-view, .modal-container');
+const TYPING_SELECTOR = 'input, textarea, select, iframe, [contenteditable=""], [contenteditable="true"], .cm-editor, .markdown-source-view, .modal-container, .canvas-node.is-editing';
+
+/**
+ * True when the event target or the focused element is any kind of text input. Obsidian 1.14
+ * edits Canvas text nodes inside an iframe, so a focused iframe also counts as typing.
+ */
+export function isTypingTarget(target: EventTarget | null, active: Element | null = null): boolean {
+	for (const t of [target, active]) {
+		if (!t || typeof (t as Element).closest !== 'function') continue;
+		const el = t as HTMLElement;
+		if (el.isContentEditable) return true;
+		if (el.closest(TYPING_SELECTOR)) return true;
+	}
+	return false;
 }
 
 export function findConflicts(map: Record<HotkeyAction, string>): string[] {

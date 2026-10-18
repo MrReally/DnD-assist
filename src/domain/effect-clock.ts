@@ -39,15 +39,13 @@ export function emitEvent(
 		if (!matches(effect, ev)) continue;
 		const d = effect.duration;
 		if (d.kind !== 'turns' && d.kind !== 'rounds') continue;
-		const before = structuredClone(effect);
 		const remaining = d.remaining - 1;
 		if (remaining <= 0) {
 			delete state.effects[id];
-			changes.push({ effectId: id, before, after: null });
+			changes.push({ effectId: id, kind: 'expire', before: structuredClone(effect) });
 		} else {
-			const after: Effect = { ...effect, duration: { ...d, remaining } };
-			state.effects[id] = after;
-			changes.push({ effectId: id, before, after: structuredClone(after) });
+			state.effects[id] = { ...effect, duration: { ...d, remaining } };
+			changes.push({ effectId: id, kind: 'tick', from: d.remaining, to: remaining });
 		}
 	}
 	return ev;
@@ -58,10 +56,14 @@ export function revertEffectChanges(state: AdventureState, changes: EffectChange
 	for (let i = changes.length - 1; i >= 0; i--) {
 		const ch = changes[i] as EffectChange;
 		const current = state.effects[ch.effectId];
-		if (ch.after === null) {
+		if (ch.kind === 'expire') {
 			if (!current) state.effects[ch.effectId] = structuredClone(ch.before);
-		} else if (current && JSON.stringify(current) === JSON.stringify(ch.after)) {
-			state.effects[ch.effectId] = structuredClone(ch.before);
+			continue;
+		}
+		// Only revert a tick if nobody edited the effect since (its counter is exactly what we set).
+		const d = current?.duration;
+		if (current && d && (d.kind === 'turns' || d.kind === 'rounds') && d.remaining === ch.to) {
+			state.effects[ch.effectId] = { ...current, duration: { ...d, remaining: ch.from } };
 		}
 	}
 }

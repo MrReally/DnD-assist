@@ -83,13 +83,19 @@ function requireEncounter(state: AdventureState): Encounter {
 	return state.activeEncounter;
 }
 
-const TURN_LOG_KEEP = 50;
+/** «Previous turn» reaches back this many turns (Undo history covers longer spans). */
+const TURN_LOG_KEEP = 20;
+/** Pruned in batches so most undo patches only contain the newly added entry. */
+const TURN_LOG_PRUNE_BATCH = 10;
 
 function pushTurnLog(enc: Encounter, entry: TurnLogEntry): void {
 	enc.turnLogSeq += 1;
 	enc.turnLog[String(enc.turnLogSeq)] = entry;
-	const stale = String(enc.turnLogSeq - TURN_LOG_KEEP);
-	if (enc.turnLog[stale]) delete enc.turnLog[stale];
+	const keys = Object.keys(enc.turnLog);
+	if (keys.length > TURN_LOG_KEEP + TURN_LOG_PRUNE_BATCH) {
+		const sorted = keys.map(Number).sort((a, b) => a - b);
+		for (const k of sorted.slice(0, sorted.length - TURN_LOG_KEEP)) delete enc.turnLog[String(k)];
+	}
 }
 
 function popTurnLog(enc: Encounter): TurnLogEntry | undefined {

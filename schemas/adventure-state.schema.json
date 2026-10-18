@@ -1,0 +1,249 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://example.invalid/canvas-assist/adventure-state/v2",
+	"title": "Canvas Assist Adventure State v2",
+	"description": "Sidecar file <AdventureRoot>/.canvas-assist-state.json. v1 (schemas/adventure-state.v1.schema.json) is migrated automatically with a backup. Unknown data lives only in `extensions` objects.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schemaVersion", "stateId", "adventureId", "rootPath", "name", "revision", "activePartyId", "parties", "characters", "creatures", "encounterTemplates", "activeEncounter", "effects", "eventSeq", "gameClock", "nodeOverrides", "history", "appliedActionIds", "extensions"],
+	"properties": {
+		"schemaVersion": { "const": 2 },
+		"stateId": { "type": "string", "minLength": 1, "description": "Changes when the state is recreated; used for conflict detection together with revision." },
+		"adventureId": { "type": "string", "minLength": 1 },
+		"rootPath": { "type": "string", "description": "Vault-relative adventure root (informational; the registry is authoritative)." },
+		"name": { "type": "string" },
+		"revision": { "type": "integer", "minimum": 0 },
+		"activePartyId": { "type": ["string", "null"] },
+		"parties": { "type": "array", "items": { "$ref": "#/$defs/party" } },
+		"characters": { "type": "object", "additionalProperties": { "$ref": "#/$defs/character" } },
+		"creatures": { "type": "object", "additionalProperties": { "$ref": "#/$defs/creature" } },
+		"encounterTemplates": { "type": "array", "items": { "$ref": "#/$defs/template" } },
+		"activeEncounter": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/encounter" }] },
+		"effects": { "type": "object", "additionalProperties": { "$ref": "#/$defs/effect" } },
+		"eventSeq": { "type": "integer", "minimum": 0 },
+		"gameClock": { "type": "object", "additionalProperties": false, "required": ["minutes"], "properties": { "minutes": { "type": "integer", "minimum": 0 } } },
+		"nodeOverrides": {
+			"type": "object",
+			"description": "Canvas path relative to the root → nodeId → manual category.",
+			"additionalProperties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/category" } }
+		},
+		"history": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["undo", "redo"],
+			"properties": { "undo": { "type": "array", "items": { "$ref": "#/$defs/historyEntry" } }, "redo": { "type": "array", "items": { "$ref": "#/$defs/historyEntry" } } }
+		},
+		"appliedActionIds": { "type": "array", "items": { "type": "string" }, "maxItems": 500 },
+		"extensions": { "type": "object" }
+	},
+	"$defs": {
+		"id": { "type": "string", "minLength": 1 },
+		"category": { "enum": ["plot", "npc", "loot", "homebrew", "notes", "ignore"] },
+		"intOrNull": { "type": ["integer", "null"] },
+		"relPath": { "type": "string", "not": { "pattern": "(^/)|(^|/)\\.\\.(/|$)" } },
+		"hp": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["current", "max", "temporary"],
+			"properties": { "current": { "type": "integer", "minimum": 0 }, "max": { "type": ["integer", "null"], "minimum": 0 }, "temporary": { "type": "integer", "minimum": 0 } }
+		},
+		"party": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "characterIds"],
+			"properties": { "id": { "$ref": "#/$defs/id" }, "name": { "type": "string" }, "characterIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } } }
+		},
+		"source": {
+			"type": ["object", "null"],
+			"additionalProperties": false,
+			"required": ["provider", "ref"],
+			"properties": { "provider": { "enum": ["ttg2014", "note", "local", "custom", "fantasy-statblocks"] }, "ref": { "type": "string" }, "url": { "type": "string" } }
+		},
+		"character": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "notePath", "classes", "hp", "ac", "initiativeModifier", "speedFeet", "spellSlots", "hitDice", "deathSaves", "inspiration", "exhaustion", "counters"],
+			"properties": {
+				"id": { "$ref": "#/$defs/id" },
+				"name": { "type": "string" },
+				"notePath": { "$ref": "#/$defs/relPath" },
+				"classes": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["name", "level"], "properties": { "name": { "type": "string" }, "level": { "type": "integer", "minimum": 1, "maximum": 20 } } } },
+				"hp": { "$ref": "#/$defs/hp" },
+				"ac": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+				"initiativeModifier": { "type": ["integer", "null"], "minimum": -30, "maximum": 30 },
+				"speedFeet": { "type": ["integer", "null"], "minimum": 0, "maximum": 1000 },
+				"spellSlots": {
+					"type": "object",
+					"additionalProperties": false,
+					"patternProperties": { "^[1-9]$": { "type": "object", "additionalProperties": false, "required": ["current", "max"], "properties": { "current": { "type": "integer", "minimum": 0 }, "max": { "type": "integer", "minimum": 0, "maximum": 99 } } } }
+				},
+				"hitDice": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["die", "total", "remaining"], "properties": { "die": { "enum": ["d4", "d6", "d8", "d10", "d12", "d20"] }, "total": { "type": "integer", "minimum": 0 }, "remaining": { "type": "integer", "minimum": 0 } } } },
+				"deathSaves": { "type": "object", "additionalProperties": false, "required": ["successes", "failures"], "properties": { "successes": { "type": "integer", "minimum": 0, "maximum": 3 }, "failures": { "type": "integer", "minimum": 0, "maximum": 3 } } },
+				"inspiration": { "type": "boolean" },
+				"exhaustion": { "type": "integer", "minimum": 0, "maximum": 6 },
+				"counters": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["id", "name", "current", "max", "recovery"],
+						"properties": { "id": { "type": "string" }, "name": { "type": "string" }, "current": { "type": "integer", "minimum": 0 }, "max": { "type": ["integer", "null"], "minimum": 0 }, "recovery": { "enum": ["manual", "short", "long"] } }
+					}
+				},
+				"extensions": { "type": "object" }
+			}
+		},
+		"creature": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "aliases", "ac", "hpMax", "initiativeModifier", "speed", "notes", "source"],
+			"properties": {
+				"id": { "$ref": "#/$defs/id" },
+				"name": { "type": "string" },
+				"aliases": { "type": "array", "items": { "type": "string" } },
+				"ac": { "$ref": "#/$defs/intOrNull" },
+				"hpMax": { "$ref": "#/$defs/intOrNull" },
+				"initiativeModifier": { "$ref": "#/$defs/intOrNull" },
+				"speed": { "type": "string" },
+				"notes": { "type": "string" },
+				"source": { "$ref": "#/$defs/source" }
+			}
+		},
+		"templateEntry": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "kind", "name", "count", "creatureId", "notePath", "sourceUrl", "hpMax", "ac", "initiativeModifier", "sharedInitiative"],
+			"properties": {
+				"id": { "$ref": "#/$defs/id" },
+				"kind": { "enum": ["creature", "note", "custom"] },
+				"name": { "type": "string" },
+				"count": { "type": "integer", "minimum": 1, "maximum": 100 },
+				"creatureId": { "type": ["string", "null"] },
+				"notePath": { "type": ["string", "null"] },
+				"sourceUrl": { "type": ["string", "null"] },
+				"hpMax": { "$ref": "#/$defs/intOrNull" },
+				"ac": { "$ref": "#/$defs/intOrNull" },
+				"initiativeModifier": { "$ref": "#/$defs/intOrNull" },
+				"sharedInitiative": { "type": "boolean" }
+			}
+		},
+		"template": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "partyId", "includeParty", "entries", "notes"],
+			"properties": { "id": { "$ref": "#/$defs/id" }, "name": { "type": "string" }, "partyId": { "type": ["string", "null"] }, "includeParty": { "type": "boolean" }, "entries": { "type": "array", "items": { "$ref": "#/$defs/templateEntry" } }, "notes": { "type": "string" } }
+		},
+		"combatant": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "kind", "characterId", "creatureId", "source", "displayName", "initiative", "initiativeModifier", "tieOrder", "initiativeGroupId", "hp", "ac", "acOverride", "defeated"],
+			"properties": {
+				"id": { "$ref": "#/$defs/id" },
+				"kind": { "enum": ["pc", "monster", "npc", "other"] },
+				"characterId": { "type": ["string", "null"] },
+				"creatureId": { "type": ["string", "null"] },
+				"source": { "$ref": "#/$defs/source" },
+				"displayName": { "type": "string" },
+				"initiative": { "type": ["integer", "null"], "minimum": -50, "maximum": 100 },
+				"initiativeModifier": { "$ref": "#/$defs/intOrNull" },
+				"tieOrder": { "type": "integer" },
+				"initiativeGroupId": { "type": ["string", "null"] },
+				"hp": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/hp" }] },
+				"ac": { "$ref": "#/$defs/intOrNull" },
+				"acOverride": { "$ref": "#/$defs/intOrNull" },
+				"defeated": { "type": "boolean" }
+			}
+		},
+		"effectChange": {
+			"oneOf": [
+				{ "type": "object", "additionalProperties": false, "required": ["effectId", "kind", "from", "to"], "properties": { "effectId": { "type": "string" }, "kind": { "const": "tick" }, "from": { "type": "integer" }, "to": { "type": "integer" } } },
+				{ "type": "object", "additionalProperties": false, "required": ["effectId", "kind", "before"], "properties": { "effectId": { "type": "string" }, "kind": { "const": "expire" }, "before": { "$ref": "#/$defs/effect" } } }
+			]
+		},
+		"encounter": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "name", "templateId", "partyId", "startedAt", "round", "activeSlotId", "turnInstanceId", "turnEnded", "actedThisRound", "paused", "combatants", "groups", "insertion", "turnLog", "turnLogSeq"],
+			"properties": {
+				"id": { "$ref": "#/$defs/id" },
+				"name": { "type": "string" },
+				"templateId": { "type": ["string", "null"] },
+				"partyId": { "type": ["string", "null"] },
+				"startedAt": { "type": "string" },
+				"round": { "type": "integer", "minimum": 0 },
+				"activeSlotId": { "type": ["string", "null"] },
+				"turnInstanceId": { "type": ["string", "null"] },
+				"turnEnded": { "type": "boolean" },
+				"actedThisRound": { "type": "array", "items": { "type": "string" } },
+				"paused": { "type": "boolean" },
+				"combatants": { "type": "object", "additionalProperties": { "$ref": "#/$defs/combatant" } },
+				"groups": {
+					"type": "object",
+					"additionalProperties": { "type": "object", "additionalProperties": false, "required": ["id", "name", "initiative", "tieOrder"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "initiative": { "type": ["integer", "null"] }, "tieOrder": { "type": "integer" } } }
+				},
+				"insertion": { "type": "array", "items": { "type": "string" } },
+				"turnLog": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["fromSlotId", "fromRound", "fromTurnInstanceId", "fromActed", "fromTurnEnded", "changes"],
+						"properties": {
+							"fromSlotId": { "type": ["string", "null"] },
+							"fromRound": { "type": "integer", "minimum": 0 },
+							"fromTurnInstanceId": { "type": ["string", "null"] },
+							"fromActed": { "type": "array", "items": { "type": "string" } },
+							"fromTurnEnded": { "type": "boolean" },
+							"changes": { "type": "array", "items": { "$ref": "#/$defs/effectChange" } }
+						}
+					}
+				},
+				"turnLogSeq": { "type": "integer", "minimum": 0 }
+			}
+		},
+		"duration": {
+			"oneOf": [
+				{ "type": "object", "additionalProperties": false, "required": ["kind"], "properties": { "kind": { "const": "manual" } } },
+				{ "type": "object", "additionalProperties": false, "required": ["kind", "ownerCombatantId", "phase", "remaining"], "properties": { "kind": { "const": "turns" }, "ownerCombatantId": { "type": "string", "minLength": 1 }, "phase": { "enum": ["start", "end"] }, "remaining": { "type": "integer", "minimum": 0 } } },
+				{ "type": "object", "additionalProperties": false, "required": ["kind", "phase", "remaining"], "properties": { "kind": { "const": "rounds" }, "phase": { "enum": ["start", "end"] }, "remaining": { "type": "integer", "minimum": 0 } } },
+				{ "type": "object", "additionalProperties": false, "required": ["kind", "expiresAtMinute"], "properties": { "kind": { "const": "game-time" }, "expiresAtMinute": { "type": "integer", "minimum": 0 } } }
+			]
+		},
+		"effect": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["id", "conditionId", "label", "target", "sourceCombatantId", "sourceLabel", "duration", "createdAtEventSeq", "isConcentration", "concentrationEffectId", "needsDecision", "notes"],
+			"properties": {
+				"id": { "$ref": "#/$defs/id" },
+				"conditionId": { "type": ["string", "null"] },
+				"label": { "type": "string" },
+				"target": { "type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": { "kind": { "enum": ["character", "combatant"] }, "id": { "type": "string", "minLength": 1 } } },
+				"sourceCombatantId": { "type": ["string", "null"] },
+				"sourceLabel": { "type": "string" },
+				"duration": { "$ref": "#/$defs/duration" },
+				"createdAtEventSeq": { "type": "integer", "minimum": 0 },
+				"isConcentration": { "type": "boolean" },
+				"concentrationEffectId": { "type": ["string", "null"] },
+				"needsDecision": { "type": "boolean" },
+				"notes": { "type": "string" }
+			}
+		},
+		"historyEntry": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["actionId", "type", "label", "at", "adventureId", "patch"],
+			"properties": {
+				"actionId": { "type": "string" },
+				"type": { "type": "string" },
+				"label": { "type": "string" },
+				"at": { "type": "string" },
+				"adventureId": { "type": "string" },
+				"patch": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path"], "properties": { "path": { "type": "array", "items": { "type": "string" } }, "before": {}, "after": {} } } },
+				"files": {
+					"type": "array",
+					"items": { "type": "object", "additionalProperties": false, "required": ["path", "beforeBlock", "afterBlock"], "properties": { "path": { "type": "string" }, "beforeBlock": { "type": ["string", "null"] }, "afterBlock": { "type": "string" }, "appendedSeparator": { "type": "string" } } }
+				}
+			}
+		}
+	}
+}

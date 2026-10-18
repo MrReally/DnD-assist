@@ -166,7 +166,7 @@ export default class CanvasAssistPlugin extends Plugin {
 	/** Contextual hotkeys: only inside an adventure Canvas, never while typing; safe no-op otherwise. */
 	private onKeydown(ev: KeyboardEvent): void {
 		if (!this.cfg.contextualHotkeys || ev.repeat) return;
-		if (isTypingTarget(ev.target) || document.querySelector('.modal-container')) return;
+		if (isTypingTarget(ev.target, document.activeElement) || document.querySelector('.modal-container')) return;
 		if (!this.inAdventureCanvas()) return;
 		for (const [action, text] of Object.entries(this.cfg.hotkeys) as Array<[HotkeyAction, string]>) {
 			const hk = text ? parseHotkey(text) : null;

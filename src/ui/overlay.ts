@@ -56,8 +56,12 @@ export function renderEffectPills(parent: HTMLElement, state: AdventureState, ef
 	}
 }
 
+/**
+ * The overlay is mounted next to (not inside) the canvas content element: the Canvas captures
+ * pointer events on its own subtree, which would swallow clicks on our controls.
+ */
 function hostElement(leaf: WorkspaceLeaf): HTMLElement {
-	return (leaf.view as unknown as { contentEl?: HTMLElement }).contentEl ?? leaf.view.containerEl;
+	return leaf.view.containerEl;
 }
 
 export class CanvasOverlay {
@@ -83,10 +87,18 @@ export class CanvasOverlay {
 		const container = hostElement(leaf);
 		container.addClass('ca-host');
 		this.root = container.createDiv({ cls: 'ca-overlay', attr: { 'data-testid': 'ca-overlay' } });
-		this.bar = this.root.createDiv({ cls: 'ca-bar', attr: { role: 'toolbar', 'aria-label': 'Canvas Assist' } });
-		this.ribbon = this.root.createDiv({ cls: 'ca-ribbon', attr: { role: 'list', 'aria-label': 'Порядок инициативы' } });
-		this.nav = this.root.createDiv({ cls: 'ca-nav' });
+		// Bar, ribbon and navigator flow in one column, so a wrapped bar never hides the ribbon.
+		const stack = this.root.createDiv({ cls: 'ca-stack' });
+		this.bar = stack.createDiv({ cls: 'ca-bar', attr: { role: 'toolbar', 'aria-label': 'Canvas Assist' } });
+		this.ribbon = stack.createDiv({ cls: 'ca-ribbon', attr: { role: 'list', 'aria-label': 'Порядок инициативы' } });
+		this.nav = stack.createDiv({ cls: 'ca-nav' });
 		this.targetBar = this.root.createDiv({ cls: 'ca-targetbar' });
+		// Keep pointer/wheel/key events of our controls away from the Canvas underneath.
+		for (const type of ['pointerdown', 'mousedown', 'dblclick', 'wheel', 'touchstart', 'keydown'] as const) {
+			this.root.addEventListener(type, (ev) => {
+				if (ev.target !== this.root) ev.stopPropagation();
+			});
+		}
 		this.unsub = ctl.onChange((r) => this.schedule(r));
 		this.renderAll();
 	}
@@ -108,7 +120,36 @@ export class CanvasOverlay {
 
 	private navDirty = true;
 
-	renderAll(): void {
+	/** Cheap signature of everything the bar/ribbon/target bar show; unchanged → no DOM rebuild. */
+	private viewKey(): string {
+		const c = this.ctl;
+		const st = c.store;
+		return [
+			c.activeAdventureId,
+			st?.state?.stateId,
+			st?.state?.revision,
+			st?.info.status,
+			st?.info.mode,
+			JSON.stringify(c.target),
+			c.settings.barCollapsed,
+			c.settings.navigatorCollapsed,
+			this.isActive(),
+			c.unregisteredHint,
+		].join('|');
+	}
+
+	private lastKey = '';
+
+	renderAll(force = false): void {
+		const key = this.viewKey();
+		if (!force && key === this.lastKey && !this.navDirty) return;
+		const changed = force || key !== this.lastKey;
+		this.lastKey = key;
+		if (!changed) {
+			this.navDirty = false;
+			void this.renderNav();
+			return;
+		}
 		const active = this.isActive();
 		this.root.toggleClass('ca-inactive', !active);
 		this.root.toggleClass('ca-collapsed', this.ctl.settings.barCollapsed);
@@ -130,7 +171,8 @@ export class CanvasOverlay {
 		button(el, '', () => {
 			ctl.settings.barCollapsed = !ctl.settings.barCollapsed;
 			void this.host.saveSettings();
-			this.renderAll();
+			this.navDirty = true;
+			this.renderAll(true);
 		}, { icon: ctl.settings.barCollapsed ? 'chevron-right' : 'swords', cls: 'ca-brand', title: ctl.settings.barCollapsed ? 'Развернуть Canvas Assist' : 'Свернуть Canvas Assist', testId: 'bar-toggle' });
 		if (ctl.settings.barCollapsed) {
 			const enc = s?.activeEncounter;
@@ -181,7 +223,7 @@ export class CanvasOverlay {
 			ctl.settings.navigatorCollapsed = !ctl.settings.navigatorCollapsed;
 			void this.host.saveSettings();
 			this.navDirty = true;
-			this.renderAll();
+			this.renderAll(true);
 		}, { icon: 'search', title: 'Навигатор', cls: ctl.settings.navigatorCollapsed ? '' : 'is-on', testId: 'bar-nav' });
 		button(el, '', () => this.host.openPanel(), { icon: 'panel-right', title: 'Панель Canvas Assist', testId: 'bar-panel' });
 	}
@@ -196,8 +238,13 @@ export class CanvasOverlay {
 	private async openRegister(): Promise<void> {
 		const file = this.ctl.activeCanvas;
 		if (!file) return;
-		const cands = await this.ctl.registry.candidatesFor(file.path);
-		new RegisterAdventureModal(this.ctl, cands).open();
+		try {
+			const cands = await this.ctl.registry.candidatesFor(file.path);
+			new RegisterAdventureModal(this.ctl, cands).open();
+		} catch (err) {
+			console.error('[Canvas Assist] register failed', err);
+			new Notice(`Canvas Assist: ${err instanceof Error ? err.message : String(err)}`);
+		}
 	}
 
 	private async switchParty(partyId: string | null): Promise<void> {
@@ -501,7 +548,7 @@ export class CanvasOverlay {
 		const it = this.ctl.lastIndex.items.find((i) => i.nodeId === e.nodeId);
 		if (it) this.focusItem(it);
 		this.navDirty = true;
-		this.renderAll();
+		this.renderAll(true);
 	}
 
 	focusSearch(): void {
@@ -510,7 +557,7 @@ export class CanvasOverlay {
 			void this.host.saveSettings();
 		}
 		this.navDirty = true;
-		this.renderAll();
+		this.renderAll(true);
 		window.setTimeout(() => this.nav.querySelector<HTMLInputElement>('.ca-nav-search')?.focus(), 50);
 	}
 

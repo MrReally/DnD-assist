@@ -62,7 +62,7 @@ export const DEFAULT_SETTINGS: CanvasAssistSettings = {
 	ttgOnlineSearch: false,
 	fantasyStatblocks: false,
 	offlineReferencePath: '',
-	navigatorCollapsed: false,
+	navigatorCollapsed: true,
 	barCollapsed: false,
 };
 

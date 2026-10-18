@@ -69,7 +69,16 @@ export class CanvasAssistPanel extends ItemView {
 		this.contentEl.empty();
 	}
 
+	private lastKey = '';
+
+	private viewKey(): string {
+		const c = this.ctl;
+		const st = c.store;
+		return [this.tab, c.activeAdventureId, st?.state?.stateId, st?.state?.revision, st?.info.mode, st?.info.message, c.activeCanvas?.path, JSON.stringify(c.target), this.openChar].join('|');
+	}
+
 	private schedule(_r: ChangeReason): void {
+		if (this.viewKey() === this.lastKey) return;
 		if (this.queued) return;
 		this.queued = true;
 		window.requestAnimationFrame(() => {
@@ -85,6 +94,7 @@ export class CanvasAssistPanel extends ItemView {
 
 	/** Re-render while keeping keyboard focus on the same logical field. */
 	render(): void {
+		this.lastKey = this.viewKey();
 		const el = this.contentEl;
 		const focusKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
 		el.empty();

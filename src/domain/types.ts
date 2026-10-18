@@ -174,12 +174,10 @@ export interface Effect {
 
 export type TurnEventType = 'turn-start' | 'turn-end' | 'round-start' | 'round-end';
 
-export interface EffectChange {
-	effectId: string;
-	before: Effect;
-	/** null = expired (removed). */
-	after: Effect | null;
-}
+/** Compact record of what one turn event did to an effect (used by «previous turn»). */
+export type EffectChange =
+	| { effectId: string; kind: 'tick'; from: number; to: number }
+	| { effectId: string; kind: 'expire'; before: Effect };
 
 /** Record of one turn advance, used by "previous turn" to restore exactly. */
 export interface TurnLogEntry {
