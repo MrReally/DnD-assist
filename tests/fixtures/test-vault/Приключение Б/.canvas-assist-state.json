@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "adventureId": "adv-B",
+  "rootPath": "Приключение Б",
+  "revision": 0,
+  "activePartyId": "main",
+  "parties": [
+    {
+      "id": "main",
+      "name": "Основная",
+      "characterIds": [
+        "adv-B-pc-alex"
+      ]
+    }
+  ],
+  "characters": {
+    "adv-B-pc-alex": {
+      "notePath": "Elements/Персонажи/Алекс.md",
+      "hp": {
+        "current": 7,
+        "max": 12,
+        "temporary": 0
+      },
+      "ac": 13,
+      "spellSlots": {},
+      "resources": {},
+      "conditions": []
+    }
+  },
+  "encounterTemplates": [],
+  "activeEncounter": null,
+  "history": {
+    "undo": [],
+    "redo": []
+  }
+}

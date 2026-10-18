@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "group-01",
+      "type": "group",
+      "label": "NPC",
+      "x": 0,
+      "y": 0,
+      "width": 350,
+      "height": 300
+    },
+    {
+      "id": "node-01",
+      "type": "file",
+      "file": "Приключение Б/Elements/NPC/Гоблин.md",
+      "x": 30,
+      "y": 60,
+      "width": 260,
+      "height": 130
+    },
+    {
+      "id": "node-02",
+      "type": "text",
+      "text": "Сюжет: ёлка, ель; встреча.",
+      "x": 400,
+      "y": 30,
+      "width": 280,
+      "height": 125
+    },
+    {
+      "id": "node-03",
+      "type": "link",
+      "url": "https://5e14.ttg.club/bestiary/",
+      "x": 400,
+      "y": 200,
+      "width": 280,
+      "height": 150
+    },
+    {
+      "id": "group-loot",
+      "type": "group",
+      "label": "Лут",
+      "x": -100,
+      "y": 380,
+      "width": 340,
+      "height": 250
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-01",
+      "fromNode": "node-01",
+      "toNode": "node-02",
+      "fromSide": "right",
+      "toSide": "left",
+      "toEnd": "arrow"
+    }
+  ],
+  "thirdPartyFieldToPreserve": {
+    "opaque": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "nodes": [
+    {
+      "id": "node-04",
+      "type": "text",
+      "text": "Homebrew — встреча в лесу",
+      "x": 10,
+      "y": 10,
+      "width": 350,
+      "height": 175
+    },
+    {
+      "id": "node-05",
+      "type": "file",
+      "file": "Приключение А/Elements/Персонажи/Алекс.md",
+      "x": 450,
+      "y": 100,
+      "width": 320,
+      "height": 180
+    }
+  ],
+  "edges": []
+}

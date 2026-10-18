@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/canvas-assist/character-import/v1",
+  "title": "Canvas Assist Character Import v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "name"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "player-character" },
+    "characterId": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "class": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "level"],
+        "properties": { "name": {"type": "string", "minLength": 1}, "level": {"type": "integer", "minimum": 1, "maximum": 20} }
+      }
+    },
+    "species": { "type": ["string", "null"] },
+    "background": { "type": ["string", "null"] },
+    "abilityScores": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "str": {"$ref": "#/$defs/abilityScore"}, "dex": {"$ref": "#/$defs/abilityScore"},
+        "con": {"$ref": "#/$defs/abilityScore"}, "int": {"$ref": "#/$defs/abilityScore"},
+        "wis": {"$ref": "#/$defs/abilityScore"}, "cha": {"$ref": "#/$defs/abilityScore"}
+      }
+    },
+    "proficiencyBonus": {"type": "integer", "minimum": 0, "maximum": 12},
+    "armorClass": {"type": "integer", "minimum": 0, "maximum": 100},
+    "initiativeModifier": {"type": "integer", "minimum": -30, "maximum": 30},
+    "speedFeet": {"type": "number", "minimum": 0, "maximum": 1000},
+    "hitPoints": {"$ref": "#/$defs/hitPoints"},
+    "hitDice": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["die", "total", "remaining"], "properties": {"die": {"enum": ["d4", "d6", "d8", "d10", "d12", "d20"]}, "total": {"type": "integer", "minimum": 0}, "remaining": {"type": "integer", "minimum": 0}}}},
+    "spellSlots": {"type": "object", "patternProperties": {"^[1-9]$": {"$ref": "#/$defs/slot"}}, "additionalProperties": false},
+    "savingThrowProficiencies": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/abilityId"}},
+    "skillProficiencies": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "attacks": {"type": "array", "items": {"type": "object"}},
+    "spells": {"type": "array", "items": {"type": "object"}},
+    "features": {"type": "array", "items": {"type": "object"}},
+    "inventory": {"type": "array", "items": {"type": "object"}},
+    "customResources": {"type": "array", "items": {"type": "object"}},
+    "notes": {"type": "string"}
+  },
+  "$defs": {
+    "abilityId": {"enum": ["str", "dex", "con", "int", "wis", "cha"]},
+    "abilityScore": {"type": "integer", "minimum": 1, "maximum": 40},
+    "hitPoints": {"type": "object", "additionalProperties": false, "required": ["max", "current"], "properties": {"max": {"type": "integer", "minimum": 1, "maximum": 10000}, "current": {"type": "integer", "minimum": 0, "maximum": 10000}, "temporary": {"type": "integer", "minimum": 0, "maximum": 10000}}},
+    "slot": {"type": "object", "additionalProperties": false, "required": ["max", "current"], "properties": {"max": {"type": "integer", "minimum": 0, "maximum": 99}, "current": {"type": "integer", "minimum": 0, "maximum": 99}}}
+  }
+}

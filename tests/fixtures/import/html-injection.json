@@ -1,0 +1,1 @@
+{"schemaVersion": 1, "kind": "player-character", "name": "Хакер <img src=x onerror=alert(1)>", "notes": "<script>alert('x')</script> [[Секрет]] ![[embed.png]]", "features": [{"name": "<b>Жирный</b>", "desc": "javascript:alert(1)"}]}

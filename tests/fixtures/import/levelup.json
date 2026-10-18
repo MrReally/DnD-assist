@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1, "kind": "player-character", "characterId": "pc-mira-import", "name": "Мира",
+  "class": [{"name": "Волшебник", "level": 4}], "armorClass": 12, "initiativeModifier": 2, "speedFeet": 30,
+  "hitPoints": {"max": 26, "current": 26, "temporary": 0},
+  "hitDice": [{"die": "d6", "total": 4, "remaining": 4}],
+  "spellSlots": {"1": {"max": 4, "current": 4}, "2": {"max": 3, "current": 3}}
+}

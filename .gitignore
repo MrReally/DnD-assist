@@ -1,0 +1,10 @@
+node_modules
+main.js
+*.map
+data.json
+.DS_Store
+.vscode
+.idea
+/release/
+/tests/e2e/out/
+/tests/perf/out/

@@ -1,0 +1,4 @@
+[
+  {"schemaVersion": 1, "kind": "player-character", "name": "Кайра", "class": [{"name": "Воин", "level": 2}, {"name": "Плут", "level": 1}], "hitPoints": {"max": 24, "current": 24}, "hitDice": [{"die": "d10", "total": 2, "remaining": 2}, {"die": "d8", "total": 1, "remaining": 1}]},
+  {"schemaVersion": 1, "kind": "player-character", "name": "Гром", "class": [{"name": "Варвар", "level": 3}], "hitPoints": {"max": 35, "current": 30}}
+]

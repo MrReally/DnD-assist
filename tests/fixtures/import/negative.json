@@ -1,0 +1,1 @@
+{"schemaVersion": 1, "kind": "player-character", "name": "Минус", "hitPoints": {"max": 10, "current": -2}, "spellSlots": {"1": {"max": -1, "current": 0}}, "customResources": [{"name": "Ки", "current": -1, "max": 2}]}

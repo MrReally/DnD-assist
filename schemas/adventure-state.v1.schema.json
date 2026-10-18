@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/canvas-assist/adventure-state/v1",
+  "title": "Canvas Assist Adventure State v1 (minimum interoperable schema)",
+  "type": "object",
+  "required": ["schemaVersion", "adventureId", "rootPath", "revision", "parties", "characters", "encounterTemplates", "activeEncounter", "history"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "adventureId": {"type": "string", "minLength": 1},
+    "rootPath": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 0},
+    "activePartyId": {"type": ["string", "null"]},
+    "parties": {"type": "array", "items": {"type": "object", "required": ["id", "name", "characterIds"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "characterIds": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}}}},
+    "characters": {"type": "object", "additionalProperties": {"type": "object", "required": ["notePath", "hp"], "properties": {"notePath": {"type": "string"}, "hp": {"$ref": "#/$defs/hp"}, "ac": {"type": "integer", "minimum": 0}, "spellSlots": {"type": "object", "patternProperties": {"^[1-9]$": {"$ref": "#/$defs/slot"}}, "additionalProperties": false}, "resources": {"type": "object"}, "conditions": {"type": "array"}}}},
+    "encounterTemplates": {"type": "array"},
+    "activeEncounter": {"type": ["object", "null"]},
+    "history": {"type": "object", "required": ["undo", "redo"], "properties": {"undo": {"type": "array"}, "redo": {"type": "array"}}}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "hp": {"type": "object", "required": ["current", "max"], "properties": {"current": {"type": "integer", "minimum": 0}, "max": {"type": "integer", "minimum": 1}, "temporary": {"type": "integer", "minimum": 0}}, "additionalProperties": false},
+    "slot": {"type": "object", "required": ["current", "max"], "properties": {"current": {"type": "integer", "minimum": 0}, "max": {"type": "integer", "minimum": 0}}, "additionalProperties": false}
+  }
+}
