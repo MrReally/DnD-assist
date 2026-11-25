@@ -1,0 +1,221 @@
+{
+  "obsidian": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.14.4 Chrome/150.0.7871.250 Electron/43.7.7 Safari/537.36",
+  "window": {
+    "w": 1280,
+    "h": 800
+  },
+  "boundsError": "Error: cdpSession.send: Protocol error (Browser.getWindowForTarget): 'Browser.getWindowForTarget' wasn't found",
+  "results": [
+    {
+      "id": "S1",
+      "title": "Перехват двойного клика по узлу Canvas",
+      "ms": 1071,
+      "status": "PASS",
+      "did": "Реальный двойной клик мышью (CDP Input) по заголовку файлового узла; capture-слушатель dblclick на document; затем слушатель, гасящий событие (stopPropagation).",
+      "result": {
+        "events": [
+          {
+            "phase": 1,
+            "nodeEl": true,
+            "cls": "canvas-node",
+            "tag": "DIV"
+          }
+        ],
+        "editingAfterNativeDblclick": {
+          "isEditing": false,
+          "contentFocused": "mod-linux is-frameless is-hidden-frameless is-focused obsidian-app styled-scrollbars theme-light show-inline-title is-floating-nav auto-full-screen show-ribbon show-view-header"
+        },
+        "afterSwallow": {
+          "count": 0,
+          "isEditing": false
+        }
+      },
+      "limits": "Событие приходит в capture-фазе, но Canvas может начать редактирование раньше/параллельно (см. afterSwallow). Перехват привязан к DOM-классам Canvas (.canvas-node) — не публичный API.",
+      "fallback": "Команда «Открыть в GM Cockpit» для выбранного узла + контекстное меню узла + горячая клавиша."
+    },
+    {
+      "id": "S2",
+      "title": "Стилизация узлов Canvas (рамка выбора, метка типа)",
+      "ms": 529,
+      "status": "PASS",
+      "did": "Инъекция CSS по .canvas-node.is-focused .canvas-node-container (в 1.14.4 класс выделения — is-focused); реальный клик; чтение computed style.",
+      "result": {
+        "selectedClass": true,
+        "outline": "rgb(201, 164, 92) 2px",
+        "radius": "8px",
+        "classes": "canvas-node is-focused"
+      },
+      "limits": "Селекторы Canvas недокументированы; без JS-записи в DOM узлов. Иконки типа через ::before — не проверялись.",
+      "fallback": "Оставить штатный вид узлов."
+    },
+    {
+      "id": "S3",
+      "title": "Оверлеи (NavChip / PartyDock / лента) поверх области Canvas",
+      "ms": 342,
+      "status": "PASS",
+      "did": "Элемент position:absolute в .view-content Canvas-листа; elementFromPoint; реальный клик; колесо мыши по Canvas после.",
+      "result": {
+        "dockRect": {
+          "x": 642,
+          "y": 756,
+          "w": 200,
+          "h": 36
+        },
+        "topIsDock": true,
+        "leafRect": {
+          "x": 344,
+          "y": 40,
+          "w": 596,
+          "h": 760
+        },
+        "existingPluginOverlay": true,
+        "clicked": "1",
+        "viewportBeforeWheel": {
+          "x": 390,
+          "y": 145,
+          "z": 0
+        },
+        "afterWheel": {
+          "x": 390,
+          "y": 145,
+          "z": 0
+        }
+      },
+      "limits": "Оверлей — сосед содержимого Canvas (ADR-2 v1): внутрь .canvas-wrapper клики теряются.",
+      "fallback": "Боковая/нижняя панель Obsidian."
+    },
+    {
+      "id": "S4",
+      "title": "Программное задание положения и масштаба (точки обзора)",
+      "ms": 502,
+      "status": "PASS",
+      "did": "Зонд методов Canvas; setViewport(x,y,zoom) либо запись tx/ty/tZoom; чтение через 400 мс; координаты узла в DOM.",
+      "result": {
+        "probe": {
+          "methods": [
+            "requestSave",
+            "setViewport",
+            "zoomBy",
+            "panTo",
+            "panBy",
+            "zoomToSelection",
+            "zoomToFit",
+            "zoomToBbox",
+            "panIntoView",
+            "posCenter",
+            "posInViewport",
+            "getViewportNodes",
+            "markViewportChanged",
+            "markDirty",
+            "requestFrame",
+            "getViewportBBox",
+            "rerenderViewport",
+            "onPriorityPointerdown",
+            "smartZoom",
+            "handleDragWithPan"
+          ],
+          "props": {
+            "tx": 390,
+            "ty": 145,
+            "tZoom": 0,
+            "zoom": 0
+          }
+        },
+        "setTo": {
+          "x": 150,
+          "y": -80,
+          "zoom": 0.5
+        },
+        "used": "setViewport",
+        "after": {
+          "tx": 150,
+          "ty": -80,
+          "tZoom": 0.5
+        },
+        "nodeScreenRect": {
+          "x": 1066.26416015625,
+          "y": 693.6053466796875,
+          "w": 452.5482177734375,
+          "h": 254.55841064453125
+        }
+      },
+      "limits": "Внутренний API (tx/ty/tZoom) недокументирован; изменения Canvas между версиями возможны.",
+      "fallback": "Узлы-метки + focusNode (v1, подтверждено AC-06)."
+    },
+    {
+      "id": "S5",
+      "title": "Контрольные точки: сохранение/восстановление раскладки без игровых данных",
+      "ms": 4016,
+      "status": "PASS",
+      "did": "Копия .canvas в .canvas-assist-checkpoints; правка холста через Vault.modify при открытом Canvas; восстановление с защитной копией; сравнение числа узлов в живом view и на диске, сравнение HP в состоянии.",
+      "result": {
+        "originalNodes": 2,
+        "removedNodeId": "node-05",
+        "nodesAfterModify": 1,
+        "nodesAfterRestore": 2,
+        "nodesOnDiskAfter": 2,
+        "hpBefore": "[{\"current\":17,\"max\":28,\"temporary\":0}]",
+        "hpAfter": "[{\"current\":17,\"max\":28,\"temporary\":0}]"
+      },
+      "limits": "Восстановление — единственная запись плагина в .canvas (только по явной команде, с защитной копией). AC-38 («плагин не пишет в .canvas») надо уточнить: «не пишет, кроме явного восстановления».",
+      "fallback": "Хранить игровые данные отдельно (уже так: sidecar)."
+    },
+    {
+      "id": "S6",
+      "title": "Определение выбранного узла и связь узел↔заметка",
+      "ms": 1246,
+      "status": "PASS",
+      "did": "Реальный клик по узлу; чтение canvas.selection, node.file.path; слушатель pointerup (capture) на wrapperEl + двойной requestAnimationFrame для чтения выбора (microtask читает выбор слишком рано — Canvas обновляет selection после pointerup).",
+      "result": {
+        "selectionSize": 1,
+        "ids": [
+          "node-05"
+        ],
+        "filePaths": [
+          "Приключение А/Elements/Персонажи/Алекс.md"
+        ],
+        "types": [
+          "t"
+        ],
+        "viaEvent": true,
+        "seen": [
+          [
+            "node-05"
+          ]
+        ]
+      },
+      "limits": "canvas.selection и node.file — внутренний API; отслеживание выбора через pointerup/keyup (без polling); выбор рамкой и Ctrl+A ловится keyup/pointerup.",
+      "fallback": "Команда «Открыть в GM Cockpit» берёт файл активной заметки/узла; frontmatter canvasAssistId."
+    },
+    {
+      "id": "S7",
+      "title": "Изменение ширины боковой панели и сворачивание в рельс",
+      "ms": 2608,
+      "status": "PASS",
+      "did": "Открыта панель Canvas Assist в правой боковой панели; перетаскивание левого края мышью; setSize(340/380/420); collapse/expand.",
+      "result": {
+        "initialWidth": 340,
+        "afterDrag": 421.5,
+        "handle": {
+          "found": true,
+          "rect": {
+            "x": 940,
+            "y": 0,
+            "w": 340,
+            "h": 800
+          },
+          "splits": 1
+        },
+        "programmatic": {
+          "340": 340,
+          "380": 380,
+          "420": 420,
+          "collapsedWidth": 0
+        }
+      },
+      "limits": "Рельс 40 px: у штатного сворачивания ширина 0 — рельс потребует собственной узкой панели.",
+      "fallback": "Фиксированные ширины 340/380/420 в настройках."
+    }
+  ],
+  "pluginErrors": []
+}

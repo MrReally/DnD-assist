@@ -1,0 +1,114 @@
+{
+  "window": {
+    "W": 1280,
+    "H": 800
+  },
+  "results": [
+    {
+      "id": "C1",
+      "title": "Панель GM Cockpit открывается рядом с Canvas (команда), пустое состояние",
+      "status": "PASS",
+      "evidence": {
+        "canvasW": 896,
+        "canvasH": 760,
+        "panelW": 340
+      }
+    },
+    {
+      "id": "C2",
+      "title": "Одинарный клик выделяет узел и НЕ открывает карточку; выбор доступен через canvas.selection",
+      "status": "PASS",
+      "evidence": {
+        "selection": [
+          "Приключение А/Elements/Персонажи/Алекс.md"
+        ]
+      }
+    },
+    {
+      "id": "C3",
+      "title": "Двойной клик по узлу персонажа открывает карточку, редактирование Canvas подавлено",
+      "status": "PASS",
+      "evidence": {
+        "editing": false
+      }
+    },
+    {
+      "id": "C4",
+      "title": "Двойной клик по узлу без карточки (NPC-лист, не PC) остаётся штатным",
+      "status": "PASS",
+      "evidence": {
+        "editing": true
+      }
+    },
+    {
+      "id": "C5",
+      "title": "Запасной путь: команда «Открыть выбранный объект» и недоступность без выбора",
+      "status": "PASS",
+      "evidence": {
+        "unavailableWithoutSelection": true
+      }
+    },
+    {
+      "id": "C6",
+      "title": "Настройка: двойной клик выключен → штатное поведение",
+      "status": "PASS",
+      "evidence": {
+        "opened": 0
+      }
+    },
+    {
+      "id": "C7",
+      "title": "Редактирование HP: урон/лечение/установка, ввод ошибок, запись на диск до отображения",
+      "status": "PASS",
+      "evidence": {
+        "disk": {
+          "current": 12,
+          "max": 28,
+          "temporary": 0
+        }
+      }
+    },
+    {
+      "id": "C8",
+      "title": "Undo/Redo из панели возвращают HP (общая история Canvas Assist)",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "C9",
+      "title": "Сохранение и восстановление: SIGKILL → перезапуск → то же HP, карточка открывается снова",
+      "status": "PASS",
+      "evidence": {
+        "hp": "12 / 28"
+      }
+    },
+    {
+      "id": "C10",
+      "title": "Изоляция: узел одноимённого персонажа другого приключения не открывает чужую карточку",
+      "status": "PASS",
+      "evidence": {
+        "sameAdventureFile": true,
+        "otherAdventureFile": false
+      }
+    },
+    {
+      "id": "C12",
+      "title": "Lightkey: тестовая отправка из Obsidian доходит до локального OSC-приёмника; ошибка не блокирует игру",
+      "status": "PASS",
+      "evidence": {
+        "sent": "sent",
+        "address": "/live/Панель/cue/Огонь/toggle",
+        "bytes": 48,
+        "errorCase": "Порт должен быть 1–65535"
+      }
+    },
+    {
+      "id": "C11",
+      "title": "Ошибок плагина в консоли за весь прогон нет",
+      "status": "PASS",
+      "evidence": {
+        "pluginErrors": 0
+      }
+    }
+  ]
+}

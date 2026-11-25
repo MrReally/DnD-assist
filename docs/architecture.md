@@ -84,3 +84,23 @@ UI / горячая клавиша / команда
 6. **Копия папки приключения** с тем же `adventureId` не подключается молча: предлагается «сделать отдельным приключением» (новый ID, резервная копия).
 7. **Онлайн TTG выключен по умолчанию**; без сети нет ни одного запроса плагина (E2E AC-40 считает вызовы транспорта).
 8. **Цвета**: производные `color-mix` от переменных темы, чтобы контраст текста ≥ 4.5:1 в светлой и тёмной теме (E2E AC-41).
+
+
+## GM Cockpit (1.1.0)
+
+```text
+domain/cockpit.ts          типы и расчёты: лист, статблок, предмет, кошелёк, книга заклинаний, точки обзора; бонус атаки
+domain/cockpit-reducer.ts  мутации state.extensions.cockpit (diff/Undo общие, без смены схемы)
+domain/builder.ts          конструктор персонажа, повышение уровня, быстрый NPC
+domain/srd-data.ts         SRD 5.1: предметы, существа, классы, расы, ячейки
+domain/card.ts             узел → карточка, модель карточки (resolveCard), ввод HP
+domain/room.ts             помещение из Markdown (справочное, без учёта осмотра)
+domain/osc.ts, lightkey.ts кодировщик OSC, привязки cue
+domain/spell-import.ts     цепочка импортёров заклинаний (без сети)
+adapters/canvas-adapter.ts единственное место с живым Canvas: выбор, dblclick, камера, добавление узла
+adapters/osc-transport.ts  UDP (dgram через window.require, только компьютер)
+services/checkpoints.ts    контрольные точки .canvas
+ui/gm-panel.ts, ui/cockpit/*  панель и диалоги (нативный DOM)
+```
+
+Игровые данные — в sidecar (`extensions.cockpit`), библиотека заклинаний и привязки cue — в `data.json` плагина (глобально, офлайн). Контрольные точки — файлы `.canvas-assist-checkpoints/<canvas>/`, их восстановление не трогает sidecar.

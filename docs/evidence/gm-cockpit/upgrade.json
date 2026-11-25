@@ -1,0 +1,43 @@
+{
+  "from": "1.0.0",
+  "to": "1.1.0",
+  "results": [
+    {
+      "id": "J1",
+      "title": "Установлена v1.0.0: приключение, урон, настройки",
+      "status": "PASS",
+      "evidence": {
+        "hp": {
+          "current": 13,
+          "max": 28,
+          "temporary": 0
+        }
+      }
+    },
+    {
+      "id": "J2",
+      "title": "После обновления: версия, данные, настройки, реестр, история сохранены",
+      "status": "PASS",
+      "evidence": {
+        "hp": {
+          "current": 13,
+          "max": 28,
+          "temporary": 0
+        },
+        "skip": false,
+        "key": "Shift+Q",
+        "adventures": 1,
+        "undo": 1,
+        "schema": 2,
+        "dblclick": true,
+        "lk": 21600
+      }
+    },
+    {
+      "id": "J3",
+      "title": "Новая панель работает на старом состоянии; Undo действия из v1 работает",
+      "status": "PASS",
+      "evidence": null
+    }
+  ]
+}
