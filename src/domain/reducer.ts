@@ -12,6 +12,7 @@ import {
 	slotOf,
 } from './combat';
 import { addCombatant } from './encounter';
+import { reduceCockpit } from './cockpit-reducer';
 import { applyDamage, applyHealing, setTemporary } from './hp';
 import type { AdventureState, CharacterState, Effect, EffectTarget, HistoryEntry, HistoryLimits, HitPoints } from './types';
 import { DEFAULT_HISTORY_LIMITS } from './types';
@@ -411,6 +412,30 @@ function reduce(s: AdventureState, a: Action, opts: ReducerOptions): void {
 				if (!p) throw new DomainError('Партия не найдена');
 				for (const ch of a.characters) if (!p.characterIds.includes(ch.id)) p.characterIds.push(ch.id);
 			}
+			return;
+		case 'cockpit/cast': {
+			const ch = character(s, a.characterId);
+			const lvl = int(a.slotLevel, 'уровень ячейки', 0, 9);
+			if (lvl > 0) {
+				const slot = ch.spellSlots[String(lvl)];
+				if (!slot || slot.current <= 0) throw new DomainError(`Нет свободных ячеек ${lvl} уровня`);
+				ch.spellSlots[String(lvl)] = { ...slot, current: slot.current - 1 };
+			}
+			if (a.effect) reduce(s, { ...a, type: 'effect/add', effect: a.effect }, opts);
+			return;
+		}
+		case 'cockpit/sheet-set':
+		case 'cockpit/statblock-set':
+		case 'cockpit/npc-create':
+		case 'cockpit/character-build':
+		case 'cockpit/item-upsert':
+		case 'cockpit/item-remove':
+		case 'cockpit/item-transfer':
+		case 'cockpit/purse-set':
+		case 'cockpit/itemtype-upsert':
+		case 'cockpit/spellbook-set':
+		case 'cockpit/viewpoint-set':
+			reduceCockpit(s, a);
 			return;
 		case 'history/undo':
 		case 'history/redo':

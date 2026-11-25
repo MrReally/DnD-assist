@@ -1,3 +1,4 @@
+import type { ItemInstance, ItemType, Purse, Sheet, SpellRef, Spellbook, StatBlock, ViewPoint } from './cockpit';
 import type {
 	CharacterState,
 	Combatant,
@@ -75,6 +76,18 @@ export type ActionPayload =
 	| { type: 'clock/advance'; minutes: number }
 	| { type: 'node/override'; canvasPath: string; nodeId: string; category: NodeCategory | null }
 	| { type: 'import/apply'; characters: CharacterState[]; addToPartyId: string | null; files?: FileSnapshot[] }
+	| { type: 'cockpit/sheet-set'; characterId: string; patch: Partial<Sheet> }
+	| { type: 'cockpit/statblock-set'; statblock: StatBlock }
+	| { type: 'cockpit/npc-create'; creature: CreatureCard; statblock: StatBlock; items: ItemInstance[]; purse?: Purse }
+	| { type: 'cockpit/character-build'; character: CharacterState; sheet: Sheet; items: ItemInstance[]; purse?: Purse; book?: Spellbook; partyId?: string | null }
+	| { type: 'cockpit/item-upsert'; item: ItemInstance }
+	| { type: 'cockpit/item-remove'; itemId: string }
+	| { type: 'cockpit/item-transfer'; itemId: string; ownerKind: 'character' | 'creature'; ownerId: string; qty?: number; newId?: string }
+	| { type: 'cockpit/purse-set'; ownerId: string; purse: Purse }
+	| { type: 'cockpit/itemtype-upsert'; itemType: ItemType }
+	| { type: 'cockpit/spellbook-set'; characterId: string; book: Spellbook }
+	| { type: 'cockpit/cast'; characterId: string; spell: SpellRef; slotLevel: number; effect?: Effect }
+	| { type: 'cockpit/viewpoint-set'; canvasRel: string; slot: string; view: ViewPoint | null }
 	| { type: 'history/undo' }
 	| { type: 'history/redo' };
 
@@ -129,6 +142,18 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 	'clock/advance': 'Игровое время',
 	'node/override': 'Тип узла',
 	'import/apply': 'Импорт персонажей',
+	'cockpit/sheet-set': 'Лист персонажа',
+	'cockpit/statblock-set': 'Статблок',
+	'cockpit/npc-create': 'Быстрый NPC',
+	'cockpit/character-build': 'Новый персонаж',
+	'cockpit/item-upsert': 'Предмет',
+	'cockpit/item-remove': 'Удаление предмета',
+	'cockpit/item-transfer': 'Передача предмета',
+	'cockpit/purse-set': 'Монеты',
+	'cockpit/itemtype-upsert': 'Тип предмета',
+	'cockpit/spellbook-set': 'Книга заклинаний',
+	'cockpit/cast': 'Заклинание',
+	'cockpit/viewpoint-set': 'Точка обзора',
 	'history/undo': 'Отмена',
 	'history/redo': 'Повтор',
 };
