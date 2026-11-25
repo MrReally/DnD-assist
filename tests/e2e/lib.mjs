@@ -33,7 +33,7 @@ async function freePort() {
 }
 
 /** Creates an isolated sandbox: <root>/vault (copy of fixtures), <root>/config (Obsidian profile). */
-export function createSandbox(name, extraPlugins = []) {
+export function createSandbox(name, extraPlugins = [], size = { width: 1440, height: 900 }) {
 	const root = join(OUT, 'sandbox', name);
 	rmSync(root, { recursive: true, force: true });
 	const vault = join(root, 'vault');
@@ -51,7 +51,7 @@ export function createSandbox(name, extraPlugins = []) {
 	mkdirSync(join(profile, 'obsidian'), { recursive: true });
 	writeFileSync(join(profile, 'obsidian', 'obsidian.json'), JSON.stringify({ vaults: { e2evault0001: { path: vault, ts: Date.now(), open: true } }, updateDisabled: true }));
 	// Per-vault window state read by Obsidian on start: reference 13" laptop size.
-	writeFileSync(join(profile, 'obsidian', 'e2evault0001.json'), JSON.stringify({ x: 0, y: 0, width: 1440, height: 900, isMaximized: false, devTools: false, zoom: 0 }));
+	writeFileSync(join(profile, 'obsidian', 'e2evault0001.json'), JSON.stringify({ x: 0, y: 0, width: size.width, height: size.height, isMaximized: false, devTools: false, zoom: 0 }));
 	return { root, vault, profile, configDir };
 }
 
@@ -113,8 +113,9 @@ export class ObsidianApp {
 			const { windowId } = await this.cdp.send('Browser.getWindowForTarget');
 			await this.cdp.send('Browser.setWindowBounds', { windowId, bounds: { left: 0, top: 0, width: this.opts.width ?? 1440, height: this.opts.height ?? 900, windowState: 'normal' } });
 			await sleep(500);
-		} catch {
+		} catch (e) {
 			// Not fatal: some window managers refuse; screenshots then use the default size.
+			this.boundsError = String(e);
 		}
 		return this;
 	}
