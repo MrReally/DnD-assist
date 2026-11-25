@@ -5,7 +5,7 @@ import { ItemView, MarkdownRenderer, Notice, TFile, type WorkspaceLeaf } from 'o
 import { parseRoom } from '../domain/room';
 import { sendCue, DgramTransport } from '../adapters/osc-transport';
 import { hpPercent, modText, parseHpInput, resolveCard, weaponItemsOf, type AttackRow, type CardModel } from '../domain/card';
-import { resolveItemType } from '../domain/builder';
+import { levelUp, resolveItemType } from '../domain/builder';
 import { ABILITIES, ABILITY_RU, SKILLS, carriedWeight, cockpitOf, formatCost, formatWeight, isProficientWith, itemsOf, profBonusOf, purseOf, saveBonus, signed, skillBonus, spellAttackBonus, spellDc, weaponAttack, type ItemInstance, type Purse } from '../domain/cockpit';
 import { newId } from '../domain/ids';
 import { armorClassLabel } from '../domain/srd-data';
@@ -472,9 +472,28 @@ export class GmCockpitPanel extends ItemView {
 				inp.addEventListener('change', () => void this.ctl.act({ type: 'cockpit/sheet-set', characterId: id, patch: { abilities: { ...sh.abilities, [a]: Math.max(1, Math.min(40, Math.floor(Number(inp.value)) || 10)) } } }));
 			}
 			const saves = sec(`Спасброски (мастерство ${signed(prof)})`);
-			for (const a of ABILITIES) saves.createDiv({ text: `${sh.saveProf.includes(a) ? '● ' : '○ '}${ABILITY_RU[a]} ${signed(saveBonus(sh, a, prof))}` });
-			const sk = sec('Навыки');
-			for (const s of SKILLS) sk.createDiv({ text: `${sh.skills[s.id] === 2 ? '◆ ' : sh.skills[s.id] ? '● ' : '○ '}${s.ru} ${signed(skillBonus(sh, s.id, prof))}` });
+			for (const a of ABILITIES) {
+				const lab = saves.createEl('label', { cls: 'gmc-check gmc-line' });
+				const cb = lab.createEl('input', { type: 'checkbox', attr: { 'data-testid': `gmc-save-${a}` } });
+				cb.checked = sh.saveProf.includes(a);
+				cb.addEventListener('change', () => void this.ctl.act({ type: 'cockpit/sheet-set', characterId: id, patch: { saveProf: cb.checked ? [...sh.saveProf, a] : sh.saveProf.filter((x) => x !== a) } }));
+				lab.createSpan({ text: `${ABILITY_RU[a]} ${signed(saveBonus(sh, a, prof))}` });
+			}
+			const sk = sec('Навыки (клик: нет → мастерство → экспертиза)');
+			for (const s of SKILLS) {
+				const row = sk.createDiv({ cls: 'gmc-skill', attr: { tabindex: '0', role: 'button', 'data-testid': `gmc-skill-${s.id}` } });
+				row.setText(`${sh.skills[s.id] === 2 ? '◆ ' : sh.skills[s.id] ? '● ' : '○ '}${s.ru} ${signed(skillBonus(sh, s.id, prof))}`);
+				const cycle = (): void => {
+					const next = { ...sh.skills };
+					const cur = next[s.id] ?? 0;
+					if (cur === 0) next[s.id] = 1;
+					else if (cur === 1) next[s.id] = 2;
+					else delete next[s.id];
+					void this.ctl.act({ type: 'cockpit/sheet-set', characterId: id, patch: { skills: next } });
+				};
+				row.addEventListener('click', cycle);
+				row.addEventListener('keydown', (e) => e.key === 'Enter' && cycle());
+			}
 			const sc = spellDc(sh, prof);
 			if (sc !== null) card.createDiv({ cls: 'gmc-kv' }).setText(`Сл заклинаний ${sc} · атака заклинанием ${signed(spellAttackBonus(sh, prof) ?? 0)}`);
 			if (sh.features.length) {
@@ -482,6 +501,14 @@ export class GmCockpitPanel extends ItemView {
 				for (const x of sh.features) f.createDiv({ text: `${x.name}: ${x.text}` });
 			}
 			const ch = st.characters[id];
+			if (ch) button(card, 'Повысить уровень', () => {
+				try {
+					const r = levelUp(ch, sh);
+					void this.ctl.act({ type: 'character/upsert', character: r.character }).then((o) => o.ok && new Notice(r.warnings.join('\n'), 9000));
+				} catch (e) {
+					new Notice(e instanceof Error ? e.message : String(e), 7000);
+				}
+			}, { icon: 'arrow-up', cls: 'gmc-btn', testId: 'gmc-levelup' });
 			if (ch) card.createDiv({ cls: 'gmc-dim', text: `Скорость ${ch.speedFeet ?? '—'} фт · Кости хитов ${ch.hitDice.map((h) => `${h.remaining}/${h.total}${h.die}`).join(', ') || '—'}` });
 		}
 		if (m.statblock) {
@@ -492,6 +519,13 @@ export class GmCockpitPanel extends ItemView {
 				r.createSpan({ cls: 'gmc-dim', text: k });
 				r.createSpan({ text: v });
 			};
+			const eg = card.createDiv({ cls: 'gmc-abilgrid' });
+			for (const a of ABILITIES) {
+				const cell = eg.createDiv();
+				cell.createDiv({ cls: 'gmc-eyebrow', text: ABILITY_RU[a] });
+				const inp = cell.createEl('input', { cls: 'gmc-input', type: 'number', value: String(sb.abilities[a]), attr: { 'aria-label': ABILITY_RU[a], 'data-testid': `gmc-sb-${a}` } });
+				inp.addEventListener('change', () => void this.ctl.act({ type: 'cockpit/statblock-set', statblock: { ...sb, abilities: { ...sb.abilities, [a]: Math.max(1, Math.min(40, Math.floor(Number(inp.value)) || 10)) }, origin: sb.origin === 'official' ? 'adapted' : sb.origin } }));
+			}
 			kv('Мастерство', signed(sb.profBonus));
 			kv('ОП', sb.cr);
 			kv('Скорость', sb.speed);

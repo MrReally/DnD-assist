@@ -815,3 +815,7 @@ body {
 .gmc .gmc-btn, .gmc .gmc-btn-text { white-space: nowrap; }
 .gmc-attack-name { overflow: hidden; text-overflow: ellipsis; }
 .gmc-val { text-align: right; font-weight: 500; max-width: 70%; }
+.gmc-line { display: flex; padding: 2px 0; }
+.gmc-skill { padding: 2px 0; cursor: pointer; }
+.gmc-skill:hover { color: var(--brass); }
+.gmc-skill:focus-visible { outline: 2px solid var(--arc); outline-offset: 1px; }

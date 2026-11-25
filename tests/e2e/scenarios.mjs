@@ -152,6 +152,25 @@ await step('P3', 'Конструктор по правилам: дварф-во�
 	return { hp: b.hp.max, ac: b.ac };
 });
 
+await step('P3c', 'Повышение уровня и правка листа в полной карточке (мастерство навыка, спасбросок, характеристика)', async () => {
+	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), evidence.borin);
+	await L('gmc-full').click();
+	await L('gmc-levelup').click();
+	await sleep(600);
+	let b = (await state()).characters[evidence.borin];
+	assert(b.classes[0].level === 4 && b.hp.max === 28 + 8, `level ${b.classes[0].level} hp ${b.hp.max}`); // d10 avg 6 + CON 2
+	assert(b.hitDice[0].total === 4, 'hit dice');
+	await app.page.locator('details:has([data-testid=gmc-skill-stealth]) > summary').click();
+	await L('gmc-skill-stealth').click();
+	await L('gmc-edit-str').fill('18'); await L('gmc-edit-str').press('Tab');
+	await sleep(500);
+	const sh = (await state()).extensions.cockpit.sheets[evidence.borin];
+	assert(sh.skills.stealth === 1 && sh.abilities.str === 18, JSON.stringify(sh.skills));
+	await L('gmc-back').click();
+	// longsword attack now uses STR 18 (+4) + prof (+2 at level 4) = +6
+	assert((await L('gmc-attacks').innerText()).includes('+6'), `attack ${await L('gmc-attacks').innerText()}`);
+});
+
 await step('P3b', 'Быстрое заполнение с бумажного листа: частичные данные сохраняются', async () => {
 	await L('gmc-new-pc').click();
 	await L('bd-mode-paper').click();
@@ -519,6 +538,47 @@ await step('I', 'Независимость приключений: одинак
 	assert(!Object.keys(a.creatures).some((id) => b.creatures[id]), 'A and B creatures independent');
 	assert(a.adventureId !== b.adventureId, 'distinct adventures');
 	await openCanvas('Таверна.canvas');
+});
+
+// ---------------------------------------------------------------- K: keyboard, leaks, idle CPU
+await step('K', 'Клавиатура (Tab/Enter), утечки обработчиков при 50 открытиях панели, простой без нагрузки CPU', async () => {
+	await closeModals();
+	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), evidence.borin);
+	while (await L('gmc-back').count()) { await L('gmc-back').first().click(); await sleep(100); }
+	// keyboard: party chip and attack row are reachable and activate with Enter
+	await app.page.locator(`[data-testid="gmc-party-${alexId}"]`).focus();
+	await app.page.keyboard.press('Enter');
+	await sleep(300);
+	assert((await app.eval((id) => window.canvasAssist.ctl.cardRef.id === id, alexId)), 'party chip opens card with Enter');
+	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), evidence.borin);
+	await sleep(300);
+	const atk = app.page.locator('[data-testid^="gmc-attack-"]').first();
+	await atk.focus();
+	await app.page.keyboard.press('Enter');
+	await L('gmc-weapon').waitFor({ timeout: 3000 });
+	await L('gmc-back').click();
+	const focusable = await app.eval(() => [...document.querySelectorAll('.gmc button, .gmc [tabindex="0"], .gmc input')].every((e) => !e.disabled ? e.tabIndex >= 0 : true));
+	assert(focusable, 'controls are keyboard-focusable');
+	const before = await app.eval(() => ({ l: window.canvasAssist.ctl.listeners.size, h: performance.memory?.usedJSHeapSize ?? 0 }));
+	for (let i = 0; i < 50; i++) {
+		await app.eval(() => window.app.workspace.detachLeavesOfType('gm-cockpit-panel'));
+		await app.command('canvas-assist:cockpit-open');
+	}
+	await app.eval(() => window.app.workspace.getLeavesOfType('gm-cockpit-panel').slice(1).forEach((l) => l.detach()));
+	await sleep(500);
+	const after = await app.eval(() => ({ l: window.canvasAssist.ctl.listeners.size, h: performance.memory?.usedJSHeapSize ?? 0 }));
+	assert(after.l === before.l, `listeners ${before.l} -> ${after.l}`);
+	// idle CPU: no timers/polling — measure main-thread task time over 4 s
+	const m0 = await app.cdp.send('Performance.getMetrics').catch(() => null);
+	await app.cdp.send('Performance.enable').catch(() => undefined);
+	const a = await app.cdp.send('Performance.getMetrics');
+	await sleep(4000);
+	const b = await app.cdp.send('Performance.getMetrics');
+	const task = (r) => r.metrics.find((x) => x.name === 'TaskDuration').value;
+	const idle = (task(b) - task(a)) / 4;
+	void m0;
+	assert(idle < 0.05, `idle main-thread load ${(idle * 100).toFixed(1)}%`);
+	return { listeners: after.l, heapDeltaMiB: Math.round((after.h - before.h) / 1048576 * 10) / 10, idleLoadPct: Math.round(idle * 1000) / 10 };
 });
 
 // ---------------------------------------------------------------- G: crash recovery

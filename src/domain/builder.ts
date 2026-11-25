@@ -1,5 +1,5 @@
 // Character builder (by rules, 2014 SRD data) and quick NPC creation. Pure; ids and randomness are injected.
-import { ABILITIES, abilityMod, cockpitOf, emptySheet, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
+import { ABILITIES, abilityMod, cockpitOf, emptySheet, profByLevel, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
 import { CLASSES, CREATURE_TEMPLATES, ITEM_TYPES, RACES, spellSlotsFor, type ClassDef, type CreatureTemplate } from './srd-data';
 import { emptyCharacter } from './state';
 import type { AbilityId, AdventureState, CharacterState, CreatureCard } from './types';
@@ -216,4 +216,52 @@ export function resolveItemType(state: AdventureState, item: ItemInstance): Item
 	if (item.custom) return item.custom;
 	if (!item.typeId) return null;
 	return cockpitOf(state).itemTypes[item.typeId] ?? ITEM_TYPES[item.typeId] ?? null;
+}
+
+// ---- level up -----------------------------------------------------------------------------------
+
+export interface LevelUpResult {
+	character: CharacterState;
+	warnings: string[];
+}
+
+/**
+ * +1 level in the character's main class (first class entry that matches a known class, by Russian name).
+ * HP: average of the hit die (die/2+1) + CON modifier, never less than 1. Slots follow the PHB table;
+ * current slots keep their spent amount. Subclass is only a reminder. Anything else stays as the GM entered it.
+ */
+export function levelUp(ch: CharacterState, sheet: Sheet): LevelUpResult {
+	const warnings: string[] = [];
+	const idx = ch.classes.findIndex((k) => CLASSES.some((c) => c.ru === k.name));
+	const entry = ch.classes[idx];
+	const def = entry ? CLASSES.find((c) => c.ru === entry.name) : undefined;
+	if (!entry || !def) throw new Error('Класс персонажа не из списка SRD — повысьте уровень вручную по бумажному листу');
+	if (entry.level >= 20) throw new Error('Максимальный уровень (20)');
+	const next = structuredClone(ch);
+	const lv = entry.level + 1;
+	(next.classes[idx] as { level: number }).level = lv;
+	const gain = Math.max(1, Math.floor(def.hitDie / 2) + 1 + abilityMod(sheet.abilities.con));
+	if (next.hp.max !== null) {
+		next.hp = { ...next.hp, max: next.hp.max + gain, current: next.hp.current + gain };
+	} else warnings.push('Максимум HP не задан — не изменён');
+	const die = `d${def.hitDie}` as 'd6';
+	const hd = next.hitDice.find((h) => h.die === die);
+	if (hd) {
+		hd.total += 1;
+		hd.remaining += 1;
+	} else next.hitDice.push({ die, total: 1, remaining: 1 });
+	const slots = spellSlotsFor(def.caster, lv);
+	for (const [k, n] of Object.entries(slots)) {
+		const cur = next.spellSlots[k];
+		const spent = cur ? cur.max - cur.current : 0;
+		next.spellSlots[k] = { max: n, current: Math.max(0, n - spent) };
+	}
+	if (lv === def.subclassLevel && !sheet.subclass.trim()) warnings.push('Выберите подкласс');
+	if ([4, 8, 12, 16, 19].includes(lv)) warnings.push('Повышение характеристик или черта — внесите вручную');
+	warnings.push(`Мастерство теперь +${profByLevel(totalLevelOf(next))}. Сверьте с бумажным листом.`);
+	return { character: next, warnings };
+}
+
+function totalLevelOf(ch: CharacterState): number {
+	return ch.classes.reduce((n, c) => n + c.level, 0);
 }

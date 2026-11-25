@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armorClassFor, buildCharacter, findTemplate, findWeapon, pointBuyCost, quickNpc, resolveItemType } from '../../src/domain/builder';
+import { armorClassFor, buildCharacter, levelUp, findTemplate, findWeapon, pointBuyCost, quickNpc, resolveItemType } from '../../src/domain/builder';
 import { abilityMod, cockpitOf, emptySheet, formatCost, isProficientWith, profByLevel, spellDc, weaponAttack, type ItemInstance } from '../../src/domain/cockpit';
 import { ITEM_TYPES, spellSlotsFor } from '../../src/domain/srd-data';
 import { createAdventureState, emptyCharacter } from '../../src/domain/state';
@@ -208,5 +208,28 @@ describe('quick NPC', () => {
 		const u = dispatch(s, act(s, { type: 'history/undo' }));
 		expect(Object.keys(u.state.creatures)).toHaveLength(0);
 		expect(Object.keys(cockpitOf(u.state).statblocks)).toHaveLength(0);
+	});
+});
+
+describe('level up', () => {
+	const choices = { name: 'Тест', raceId: 'human', classId: 'wizard', level: 4, baseAbilities: { str: 8, dex: 14, con: 13, int: 15, wis: 10, cha: 12 }, background: '', subclass: 'Эвокация', skills: ['arcana', 'history'], gear: [], notePath: 'x.md' };
+	it('wizard 4→5: +HP (avg d6 + CON), +1 hit die, slots follow the table, spent slots stay spent', () => {
+		const r = buildCharacter(choices, nid);
+		r.character.spellSlots['1'] = { max: 4, current: 1 };
+		const up = levelUp(r.character, r.sheet);
+		expect(up.character.classes[0]?.level).toBe(5);
+		expect(up.character.hp.max).toBe((r.character.hp.max ?? 0) + 6); // d6: 4 + CON +2
+		expect(up.character.hitDice[0]).toMatchObject({ total: 5, remaining: 5 });
+		expect(up.character.spellSlots['3']).toEqual({ max: 2, current: 2 });
+		expect(up.character.spellSlots['1']).toEqual({ max: 4, current: 1 });
+		expect(up.warnings.some((w) => /Мастерство теперь \+3/.test(w))).toBe(true);
+		expect(r.character.classes[0]?.level).toBe(4); // input not mutated
+	});
+	it('refuses unknown classes and level 20; reminds about subclass', () => {
+		const r = buildCharacter({ ...choices, level: 1, subclass: '', classId: 'cleric' }, nid);
+		expect(() => levelUp({ ...r.character, classes: [{ name: 'Свой класс', level: 3 }] }, r.sheet)).toThrow(/вручную/);
+		expect(() => levelUp({ ...r.character, classes: [{ name: 'Жрец', level: 20 }] }, r.sheet)).toThrow(/20/);
+		const w = buildCharacter({ ...choices, level: 1, subclass: '', classId: 'wizard' }, nid);
+		expect(levelUp(w.character, w.sheet).warnings).toContain('Выберите подкласс');
 	});
 });
