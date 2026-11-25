@@ -34,6 +34,10 @@ export interface CanvasAssistSettings {
 	offlineReferencePath: string;
 	navigatorCollapsed: boolean;
 	barCollapsed: boolean;
+	/** GM Cockpit: double click on a character file node opens the card (false → native Canvas behaviour). */
+	cockpitDoubleClick: boolean;
+	/** Lightkey OSC: connection and the cue address used by the test send (copied from Lightkey). */
+	lightkey: { host: string; port: number; testAddress: string; testCommand: 'activate' | 'deactivate' | 'toggle' };
 }
 
 /**
@@ -64,13 +68,15 @@ export const DEFAULT_SETTINGS: CanvasAssistSettings = {
 	offlineReferencePath: '',
 	navigatorCollapsed: true,
 	barCollapsed: false,
+	cockpitDoubleClick: true,
+	lightkey: { host: '127.0.0.1', port: 21600, testAddress: '', testCommand: 'activate' },
 };
 
 export function mergeSettings(raw: unknown): CanvasAssistSettings {
 	const base: CanvasAssistSettings = structuredClone(DEFAULT_SETTINGS);
 	if (typeof raw !== 'object' || raw === null) return base;
 	const r = raw as Partial<CanvasAssistSettings>;
-	const out: CanvasAssistSettings = { ...base, ...r, hotkeys: { ...base.hotkeys, ...(r.hotkeys ?? {}) } };
+	const out: CanvasAssistSettings = { ...base, ...r, hotkeys: { ...base.hotkeys, ...(r.hotkeys ?? {}) }, lightkey: { ...base.lightkey, ...(r.lightkey ?? {}) } };
 	out.adventures = Array.isArray(r.adventures)
 		? r.adventures.filter((a): a is RegisteredAdventure => !!a && typeof a.adventureId === 'string' && typeof a.rootPath === 'string')
 		: [];

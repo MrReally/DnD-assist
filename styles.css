@@ -634,3 +634,63 @@ body {
 		display: none;
 	}
 }
+
+/* ===== GM Cockpit · Brass Atlas (scoped; tokens from docs/source-spec/gm-cockpit/gm.css) ===== */
+.gmc {
+	--bg0: #120f0c; --bg1: #1a1612; --bg2: #221d17; --bg3: #2b251d; --bg4: #352d23;
+	--line: #352d24; --line2: #4a3f31;
+	--tx: #ece2cb; --tx2: #bcb097; --tx3: #968b76;
+	--brass: #c9a45c; --brass2: #8f7541;
+	--hp: #b34a3f; --hpt: #ea8c80; --hpbg: #3a1d19;
+	--ok: #86b07a; --okbg: #1f2b1c; --arc: #9a94ec; --warn: #e0a94a;
+	/* Fonts are not bundled (offline, size): local families first, safe fallbacks always. */
+	--gmc-serif: 'Cormorant Garamond', 'Cormorant', Georgia, serif;
+	--gmc-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	background: var(--bg1);
+	color: var(--tx);
+	font-family: var(--gmc-sans);
+	font-size: 13px;
+	line-height: 1.4;
+	font-variant-numeric: tabular-nums;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+.gmc * { box-sizing: border-box; }
+.gmc-serif { font-family: var(--gmc-serif); font-weight: 600; letter-spacing: 0.005em; }
+.gmc-head { padding: 10px 14px; border-bottom: 1px solid var(--line); background: linear-gradient(0deg, var(--bg1), var(--bg2)); }
+.gmc-head h3 { margin: 0; font-size: 18px; color: var(--brass); }
+.gmc-body { flex: 1 1 auto; overflow: auto; padding: 12px; }
+.gmc-empty { color: var(--tx2); padding: 16px 4px; }
+.gmc-dim { color: var(--tx3); font-size: 12px; }
+.gmc-eyebrow { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--tx3); font-weight: 600; }
+.gmc-row { display: flex; flex-direction: row; align-items: center; }
+.gmc-between { justify-content: space-between; align-items: flex-start; }
+.gmc-gap { gap: 6px; }
+.gmc-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.gmc-name { margin: 0; font-size: 22px; line-height: 1.1; }
+.gmc-ac { text-align: center; border: 1px solid var(--brass2); border-radius: 8px; padding: 4px 10px; background: var(--bg0); min-width: 48px; }
+.gmc-num { font-weight: 600; font-size: 16px; color: var(--tx); }
+.gmc-ac .gmc-num { font-size: 20px; color: var(--brass); }
+.gmc-track { height: 10px; background: var(--bg0); border: 1px solid var(--line2); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+.gmc-fill { height: 100%; background: var(--ok); transition: width 0.2s ease; }
+.gmc-fill.is-low { background: var(--hp); }
+.gmc-warn { color: var(--warn); font-size: 12px; margin-top: 4px; }
+.gmc-hpform { display: flex; flex-direction: column; gap: 8px; }
+.gmc-input { height: 34px; padding: 0 10px; background: var(--bg0); border: 1px solid var(--line2); border-radius: 8px; color: var(--tx); font: inherit; width: 100%; }
+.gmc-input:hover { border-color: var(--brass2); }
+.gmc-input:focus-visible, .gmc-btn:focus-visible { outline: 2px solid var(--arc); outline-offset: 2px; box-shadow: none; }
+.gmc-input.is-error { border-color: var(--hp); }
+.gmc .gmc-btn { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line2); background: var(--bg3); color: var(--tx); font-weight: 500; cursor: pointer; box-shadow: none; }
+.gmc .gmc-btn:hover { background: var(--bg4); border-color: var(--brass2); }
+.gmc .gmc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.gmc .gmc-btn-d { background: var(--hpbg); border-color: #6b2f28; color: var(--hpt); }
+.gmc .gmc-btn-ok { background: var(--okbg); border-color: #3c5a35; color: var(--ok); }
+.gmc .gmc-btn-g { background: transparent; border-color: transparent; color: var(--tx2); }
+.gmc-links { margin-top: 2px; }
+.gmc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--bg1); }
+.gmc-save { color: var(--tx3); font-size: 12px; }
+.gmc-save.is-bad { color: var(--hpt); font-weight: 600; }
+.gmc-themed .canvas-node.is-focused .canvas-node-container { outline: 2px solid #c9a45c; outline-offset: 0; }
+@media (prefers-reduced-motion: reduce) { .gmc-fill { transition: none; } }

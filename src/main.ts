@@ -1,5 +1,9 @@
-import { Notice, Plugin, requestUrl, type WorkspaceLeaf } from 'obsidian';
+import { Notice, Plugin, requestUrl, type EventRef, type Menu, type WorkspaceLeaf } from 'obsidian';
+import { cardTargetForNote } from './domain/card';
+import { watchCanvas } from './adapters/canvas-adapter';
+import { DgramTransport, sendCue } from './adapters/osc-transport';
 import { Controller } from './controller';
+import type { SendResult } from './domain/lightkey';
 import { isTypingTarget, matchesHotkey, parseHotkey } from './services/hotkeys';
 import { mergeSettings, type CanvasAssistSettings, type HotkeyAction } from './settings';
 import { nextTurn, openDamage, openEffect, openHeal, openTempHp, previousTurn, endEncounter } from './ui/actions';
@@ -7,6 +11,7 @@ import { CardModal } from './ui/card-modal';
 import { ImportModal } from './ui/import-preview';
 import { RecoveryModal, RegisterAdventureModal } from './ui/misc-modals';
 import { CanvasOverlay } from './ui/overlay';
+import { COCKPIT_VIEW, GmCockpitPanel } from './ui/gm-panel';
 import { CanvasAssistPanel, PANEL_VIEW } from './ui/panel';
 import { RestModal } from './ui/rest-modal';
 import { CanvasAssistSettingTab } from './ui/settings-tab';
@@ -15,6 +20,7 @@ export default class CanvasAssistPlugin extends Plugin {
 	cfg!: CanvasAssistSettings;
 	ctl!: Controller;
 	private overlays = new Map<WorkspaceLeaf, CanvasOverlay>();
+	private canvasWatch = new Map<WorkspaceLeaf, { view: unknown; stop: () => void }>();
 
 	override async onload(): Promise<void> {
 		this.cfg = mergeSettings(await this.loadData());
@@ -39,9 +45,19 @@ export default class CanvasAssistPlugin extends Plugin {
 			},
 		});
 		this.registerView(PANEL_VIEW, (leaf) => new CanvasAssistPanel(leaf, this.ctl));
-		this.addSettingTab(new CanvasAssistSettingTab(this.app, this, this.ctl, () => this.saveSettings()));
+		this.registerView(COCKPIT_VIEW, (leaf) => new GmCockpitPanel(leaf, this.ctl));
+		this.addSettingTab(new CanvasAssistSettingTab(this.app, this, this.ctl, () => this.saveSettings(), () => this.testLightkey()));
 		this.registerCommands();
 		this.addRibbonIcon('swords', 'Canvas Assist', () => void this.openPanel());
+		this.addRibbonIcon('scroll-text', 'GM Cockpit', () => void this.openCockpit());
+		this.registerEvent(
+			// Canvas node context menu: not in the public typings, so the event name is cast. Absent event → no menu item.
+			(this.app.workspace as unknown as { on: (n: string, cb: (menu: Menu, node: { file?: { path?: string } }) => void) => EventRef }).on('canvas:node-menu', (menu, node) => {
+				const path = node?.file?.path;
+				if (!path || !this.ctl.state || !cardTargetForNote(this.ctl.state, path)) return;
+				menu.addItem((i) => i.setTitle('Открыть в GM Cockpit').setIcon('scroll-text').onClick(() => void this.openCockpitFor(path)));
+			}),
+		);
 
 		this.app.workspace.onLayoutReady(() => {
 			this.syncOverlays();
@@ -74,12 +90,14 @@ export default class CanvasAssistPlugin extends Plugin {
 		this.registerEvent(this.app.workspace.on('layout-change', () => this.syncOverlays()));
 		this.registerDomEvent(document, 'keydown', (ev) => this.onKeydown(ev), { capture: true });
 		// Exposed for the automated E2E harness and power users (read-only helpers).
-		(window as unknown as { canvasAssist?: unknown }).canvasAssist = { ctl: this.ctl, version: this.manifest.version };
+		(window as unknown as { canvasAssist?: unknown }).canvasAssist = { ctl: this.ctl, version: this.manifest.version, testLightkey: () => this.testLightkey() };
 	}
 
 	override onunload(): void {
 		for (const o of this.overlays.values()) o.destroy();
 		this.overlays.clear();
+		for (const w of this.canvasWatch.values()) w.stop();
+		this.canvasWatch.clear();
 		void this.ctl.shutdown();
 		delete (window as unknown as { canvasAssist?: unknown }).canvasAssist;
 	}
@@ -97,7 +115,27 @@ export default class CanvasAssistPlugin extends Plugin {
 				this.overlays.delete(leaf);
 			}
 		}
+		for (const [leaf, w] of this.canvasWatch) {
+			if (!leaves.has(leaf) || leaf.view !== w.view) {
+				w.stop();
+				this.canvasWatch.delete(leaf);
+			}
+		}
 		for (const leaf of leaves) {
+			if (!this.canvasWatch.has(leaf)) {
+				const view = leaf.view;
+				const stop = watchCanvas(view, {
+					onSelection: (paths) => {
+						this.ctl.canvasSelection = paths;
+					},
+					onDoubleClick: (path) => {
+						if (!this.cfg.cockpitDoubleClick || !this.ctl.state || !cardTargetForNote(this.ctl.state, path)) return false;
+						void this.openCockpitFor(path);
+						return true;
+					},
+				});
+				this.canvasWatch.set(leaf, { view, stop });
+			}
 			if (!this.overlays.has(leaf)) this.overlays.set(leaf, new CanvasOverlay(this.ctl, leaf, { openPanel: () => void this.openPanel(), saveSettings: () => this.saveSettings() }));
 		}
 	}
@@ -116,6 +154,33 @@ export default class CanvasAssistPlugin extends Plugin {
 		if (!leaf) return;
 		await leaf.setViewState({ type: PANEL_VIEW, active: true });
 		await this.app.workspace.revealLeaf(leaf);
+	}
+
+	/** Opens (or reveals) the GM Cockpit panel in the right sidebar. */
+	async openCockpit(): Promise<void> {
+		const existing = this.app.workspace.getLeavesOfType(COCKPIT_VIEW)[0];
+		if (existing) {
+			await this.app.workspace.revealLeaf(existing);
+			return;
+		}
+		const leaf = this.app.workspace.getRightLeaf(false);
+		if (!leaf) return;
+		await leaf.setViewState({ type: COCKPIT_VIEW, active: true });
+		await this.app.workspace.revealLeaf(leaf);
+	}
+
+	/** Test send of the configured cue. Reports the outcome; never claims the light changed. */
+	async testLightkey(): Promise<SendResult> {
+		const lk = this.cfg.lightkey;
+		const res = await sendCue(new DgramTransport(), { host: lk.host, port: lk.port }, { id: 'test', cardId: 'test', address: lk.testAddress, command: lk.testCommand, args: [], autoStart: false });
+		new Notice(res.status === 'sent' ? `Lightkey: отправлено на ${res.target} (${res.address}). Выполнение не подтверждается.` : `Lightkey: ошибка — ${res.detail}`, 8000);
+		return res;
+	}
+
+	async openCockpitFor(vaultPath: string): Promise<boolean> {
+		if (!this.ctl.openCardForPath(vaultPath)) return false;
+		await this.openCockpit();
+		return true;
 	}
 
 	private activeOverlay(): CanvasOverlay | null {
@@ -199,6 +264,19 @@ export default class CanvasAssistPlugin extends Plugin {
 				return true;
 			},
 		});
+		this.addCommand({ id: 'cockpit-open', name: 'GM Cockpit: открыть панель', callback: () => void this.openCockpit() });
+		this.addCommand({
+			id: 'cockpit-open-selected',
+			name: 'Открыть выбранный объект в GM Cockpit',
+			checkCallback: (checking) => {
+				if (!this.ctl.state || !this.inAdventureCanvas()) return false;
+				const path = this.ctl.canvasSelection.find((p) => cardTargetForNote(this.ctl.state!, p));
+				if (!path) return false;
+				if (!checking) void this.openCockpitFor(path);
+				return true;
+			},
+		});
+		this.addCommand({ id: 'lightkey-test', name: 'Lightkey: тестовая отправка', callback: () => void this.testLightkey() });
 		this.addCommand({ id: 'open-panel', name: 'Открыть панель', callback: () => void this.openPanel() });
 		this.addCommand({ id: 'search-canvas', name: 'Поиск по текущему Canvas', checkCallback: (c) => {
 			const o = this.activeOverlay();

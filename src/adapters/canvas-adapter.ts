@@ -56,3 +56,102 @@ export function focusNode(view: View | null, nodeId: string): boolean {
 		return false;
 	}
 }
+
+// ---- GM Cockpit: selection and double-click binding (spikes S1, S6; tests/e2e/spikes.mjs) ----
+
+interface LiveNodeFull extends LiveCanvasNode {
+	nodeEl?: HTMLElement;
+	file?: { path?: string };
+}
+
+interface LiveCanvasFull extends LiveCanvas {
+	selection?: Set<LiveNodeFull>;
+	nodes?: Map<string, LiveNodeFull> & LiveCanvas['nodes'];
+	wrapperEl?: HTMLElement;
+}
+
+function fullCanvas(view: View | null): LiveCanvasFull | null {
+	return liveCanvas(view) as LiveCanvasFull | null;
+}
+
+/** Vault paths of the files behind the currently selected file nodes (empty if unavailable). */
+export function selectedFilePaths(view: View | null): string[] {
+	try {
+		const sel = fullCanvas(view)?.selection;
+		if (!sel) return [];
+		const out: string[] = [];
+		for (const n of sel) if (typeof n.file?.path === 'string') out.push(n.file.path);
+		return out;
+	} catch {
+		return [];
+	}
+}
+
+/** File path of the file node that contains `target`, or null (text/group/link node, empty space). */
+export function fileNodeAt(view: View | null, target: EventTarget | null): string | null {
+	try {
+		const c = fullCanvas(view);
+		if (!c?.nodes || !(target instanceof Element)) return null;
+		const el = target.closest('.canvas-node');
+		if (!el) return null;
+		for (const n of (c.nodes as Map<string, LiveNodeFull>).values()) {
+			if (n.nodeEl === el) return typeof n.file?.path === 'string' ? n.file.path : null;
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+export interface CanvasWatchHandlers {
+	/** Called (no polling) after pointer/keyboard input has settled with the new selection. */
+	onSelection: (paths: string[]) => void;
+	/** Double click on a file node. Return true to consume it (Canvas then does not start editing). */
+	onDoubleClick: (path: string) => boolean;
+}
+
+/**
+ * Listens on the Canvas view's own container. Selection is read two animation frames after
+ * pointerup/keyup because Canvas updates `selection` after pointerup (a microtask is too early).
+ * Returns a disposer. Never throws and never writes to the canvas.
+ */
+export function watchCanvas(view: View, h: CanvasWatchHandlers): () => void {
+	const host = view.containerEl;
+	let frame = 0;
+	let last = '';
+	const read = (): void => {
+		window.cancelAnimationFrame(frame);
+		frame = window.requestAnimationFrame(() => {
+			frame = window.requestAnimationFrame(() => {
+				const paths = selectedFilePaths(view);
+				const key = paths.join('\n');
+				if (key === last) return;
+				last = key;
+				h.onSelection(paths);
+			});
+		});
+	};
+	const dbl = (ev: MouseEvent): void => {
+		const path = fileNodeAt(view, ev.target);
+		if (!path) return;
+		try {
+			if (h.onDoubleClick(path)) {
+				ev.stopPropagation();
+				ev.preventDefault();
+			}
+		} catch (err) {
+			console.error('[Canvas Assist] double click handler failed', err);
+		}
+	};
+	host.addClass('gmc-themed');
+	host.addEventListener('pointerup', read, true);
+	host.addEventListener('keyup', read, true);
+	host.addEventListener('dblclick', dbl, true);
+	return () => {
+		window.cancelAnimationFrame(frame);
+		host.removeClass('gmc-themed');
+		host.removeEventListener('pointerup', read, true);
+		host.removeEventListener('keyup', read, true);
+		host.removeEventListener('dblclick', dbl, true);
+	};
+}

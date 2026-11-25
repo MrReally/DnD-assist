@@ -4,6 +4,7 @@ import { ObsidianVaultPort } from './adapters/obsidian-vault';
 import { OfflineReference } from './adapters/offline-reference';
 import { TtgLinkProvider, TtgOnlineSearch } from './adapters/ttg-adapter';
 import type { ActionPayload } from './domain/actions';
+import { cardTargetForNote } from './domain/card';
 import { newId } from './domain/ids';
 import { relativeTo } from './domain/normalize';
 import type { ReducerOptions } from './domain/reducer';
@@ -116,6 +117,18 @@ export class Controller {
 		if (!this.activeAdventureId) return;
 		this.selection.set(this.activeAdventureId, t);
 		this.emit('selection');
+	}
+
+	/** Canvas selection mirrored by the Canvas binding (UI state only; never persisted). */
+	canvasSelection: string[] = [];
+
+	/** Opens the game card behind a vault path (a Canvas file node). Returns false if there is none. */
+	openCardForPath(vaultPath: string): boolean {
+		const st = this.state;
+		const t = st ? cardTargetForNote(st, vaultPath) : null;
+		if (!t) return false;
+		this.setTarget(t);
+		return true;
 	}
 
 	targetName(t: EffectTarget | null = this.target): string {

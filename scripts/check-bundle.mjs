@@ -4,7 +4,8 @@
 import { readFileSync, statSync } from 'node:fs';
 import { builtinModules } from 'node:module';
 
-const BUDGET = 200 * 1024;
+// GM Cockpit: v1 budget was 200 KiB; owner raised the temporary ceiling to 500 KiB (2026-11). Grow only for real features.
+const BUDGET = 512000;
 const js = readFileSync('main.js', 'utf8');
 const size = statSync('main.js').size;
 const problems = [];

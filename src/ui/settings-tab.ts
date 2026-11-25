@@ -10,6 +10,7 @@ export class CanvasAssistSettingTab extends PluginSettingTab {
 		plugin: Plugin,
 		private readonly ctl: Controller,
 		private readonly save: () => Promise<void>,
+		private readonly testLightkey: () => Promise<unknown> = async () => undefined,
 	) {
 		super(app, plugin);
 	}
@@ -59,6 +60,35 @@ export class CanvasAssistSettingTab extends PluginSettingTab {
 			cls: 'ca-muted',
 			text: 'Работают только в Canvas подключённого приключения и не срабатывают при вводе текста. Пробел не используется (панорамирование Canvas). Формат: Shift+F, Shift+Alt+Space, Ctrl+K. Пусто — отключить. Команды также доступны в «Горячих клавишах» Obsidian.',
 		});
+		new Setting(el)
+			.setName('GM Cockpit: двойной клик открывает карточку')
+			.setDesc('Двойной клик по узлу-листу персонажа открывает его карточку в GM Cockpit вместо штатного редактирования. Для остальных узлов поведение Canvas не меняется. Запасные пути: команда «Открыть выбранный объект в GM Cockpit» и пункт меню узла.')
+			.addToggle((t) => t.setValue(st.cockpitDoubleClick).onChange(async (v) => {
+				st.cockpitDoubleClick = v;
+				await this.save();
+			}));
+		new Setting(el).setName('Lightkey (OSC)').setHeading();
+		el.createDiv({ cls: 'ca-muted', text: 'Адрес cue берётся в Lightkey: cue → External Control → Copy OSC Address. Успешная отправка не означает, что свет изменился.' });
+		new Setting(el).setName('Хост').addText((t) => t.setValue(st.lightkey.host).onChange(async (v) => {
+			st.lightkey.host = v.trim();
+			await this.save();
+		}));
+		new Setting(el).setName('Порт').addText((t) => t.setValue(String(st.lightkey.port)).onChange(async (v) => {
+			const n = Number(v);
+			if (Number.isInteger(n)) {
+				st.lightkey.port = n;
+				await this.save();
+			}
+		}));
+		new Setting(el).setName('OSC-адрес тестового cue').addText((t) => t.setPlaceholder('/live/…/cue/…/activate').setValue(st.lightkey.testAddress).onChange(async (v) => {
+			st.lightkey.testAddress = v.trim();
+			await this.save();
+		}));
+		new Setting(el).setName('Команда').addDropdown((d) => d.addOptions({ activate: 'activate', deactivate: 'deactivate', toggle: 'toggle' }).setValue(st.lightkey.testCommand).onChange(async (v) => {
+			st.lightkey.testCommand = v as 'activate' | 'deactivate' | 'toggle';
+			await this.save();
+		}));
+		new Setting(el).setName('Тестовая отправка').addButton((b) => b.setButtonText('Отправить').onClick(() => void this.testLightkey()));
 		new Setting(el).setName('Контекстные горячие клавиши').addToggle((t) => t.setValue(st.contextualHotkeys).onChange(async (v) => {
 			st.contextualHotkeys = v;
 			await this.save();
