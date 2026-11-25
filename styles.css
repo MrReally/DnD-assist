@@ -694,3 +694,57 @@ body {
 .gmc-save.is-bad { color: var(--hpt); font-weight: 600; }
 .gmc-themed .canvas-node.is-focused .canvas-node-container { outline: 2px solid #c9a45c; outline-offset: 0; }
 @media (prefers-reduced-motion: reduce) { .gmc-fill { transition: none; } }
+
+/* ===== GM Cockpit: cards, inventory, spells ===== */
+.gmc { min-width: 0; }
+.gmc-col { display: flex; flex-direction: column; }
+.gmc-wrap { flex-wrap: wrap; }
+.gmc-tools { margin-top: 6px; }
+.gmc .gmc-btn-sm { height: 26px; padding: 0 8px; font-size: 12px; border-radius: 6px; }
+.gmc .gmc-btn-i { width: 26px; padding: 0; }
+.gmc .gmc-btn.is-on { border-color: var(--brass); color: var(--brass); }
+.gmc .gmc-btn-p { background: var(--brass); border-color: var(--brass); color: #1b1408; font-weight: 600; }
+.gmc .gmc-btn-a { background: #26233f; border-color: #403b7a; color: var(--arc); }
+.gmc-btn .gmc-btn-icon svg { width: 14px; height: 14px; }
+.gmc-token { width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: center; font-family: var(--gmc-serif); font-weight: 700; font-size: 18px; color: #1b1408; background: var(--brass); }
+.gmc-token-pc { border-radius: 50%; }
+.gmc-token-npc { border-radius: 50% 50% 50% 4px; background: var(--arc); }
+.gmc-token-monster { border-radius: 8px; background: var(--hp); color: var(--tx); }
+.gmc-abil { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.gmc-abil-cell { text-align: center; background: var(--bg0); border: 1px solid var(--line); border-radius: 6px; padding: 4px 0; }
+.gmc-abil-cell .gmc-num { font-size: 15px; }
+.gmc-abilgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.gmc-attacks { display: flex; flex-direction: column; gap: 4px; }
+.gmc-attack { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 8px; background: var(--bg0); border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.gmc-attack:hover { border-color: var(--brass2); background: var(--bg3); }
+.gmc-attack:focus-visible { outline: 2px solid var(--arc); outline-offset: 1px; }
+.gmc-attack-name { font-weight: 600; }
+.gmc-attack-dmg { grid-column: 1 / -1; color: var(--tx2); font-size: 12px; }
+.gmc-kv { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.gmc-how { margin-top: 4px; }
+.gmc-how summary, .gmc-sec summary { cursor: pointer; color: var(--brass); }
+.gmc-sec { border-top: 1px solid var(--line); padding-top: 6px; }
+.gmc-items { display: flex; flex-direction: column; gap: 4px; }
+.gmc-item { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: var(--bg0); border: 1px solid var(--line); border-radius: 6px; }
+.gmc-item-name { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; cursor: pointer; }
+.gmc-item-name:focus-visible { outline: 2px solid var(--arc); outline-offset: 1px; }
+.gmc-tag { font-size: 10.5px; padding: 0 6px; border: 1px solid var(--brass2); border-radius: 8px; color: var(--brass); }
+.gmc-coins { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.gmc-coins .gmc-input { padding: 0 4px; text-align: center; }
+.gmc-slots { display: flex; flex-wrap: wrap; gap: 6px; }
+.gmc-slot { background: var(--bg0); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.gmc-parch { background: #e8dec6; color: #2b2217; }
+.gmc-parch .gmc-dim, .gmc-parch .gmc-kv .gmc-dim { color: #5a4a33; }
+.gmc-parch .gmc-kv { border-color: #cdbf9b; }
+.gmc-parch .gmc-name { color: #2b2217; }
+.gmc-parch .gmc-num { color: #2b2217; }
+.gmc-spell-text { white-space: pre-wrap; }
+.gmc-pick { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow: auto; margin: 6px 0; }
+.gmc-pickrow { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--line, #444); border-radius: 6px; cursor: pointer; }
+.gmc-pickrow:hover { border-color: #8f7541; }
+.gmc-pickrow:focus-visible { outline: 2px solid #9a94ec; }
+.gmc-check { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; }
+.gmc-ta { height: auto; padding: 8px; font-family: var(--font-monospace); }
+.gmc-vp { display: grid; grid-template-columns: 20px 1fr auto auto auto; gap: 6px; align-items: center; margin-bottom: 4px; }
+.gmc-effects { display: flex; flex-wrap: wrap; gap: 4px; }
+.gmc-body { min-height: 0; }

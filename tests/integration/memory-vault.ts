@@ -50,6 +50,10 @@ export class MemoryVaultPort implements VaultPort {
 		if (v === undefined) throw new Error(`ENOENT: ${path}`);
 		return v;
 	}
+	async mkdirp(_path: string): Promise<void> {
+		/* memory vault has no real folders */
+	}
+
 	async write(path: string, data: string): Promise<void> {
 		this.checkWrite(path);
 		this.files.set(path, data);

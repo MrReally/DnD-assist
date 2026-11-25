@@ -1,3 +1,5 @@
+import type { CueBinding } from './domain/lightkey';
+import type { SpellCard } from './domain/spell-import';
 import type { RestProfile } from './domain/rest';
 
 export interface RegisteredAdventure {
@@ -37,6 +39,10 @@ export interface CanvasAssistSettings {
 	/** GM Cockpit: double click on a character file node opens the card (false → native Canvas behaviour). */
 	cockpitDoubleClick: boolean;
 	/** Lightkey OSC: connection and the cue address used by the test send (copied from Lightkey). */
+	/** Local spell library (global, offline). Only data the GM entered or imported with permission. */
+	spells: SpellCard[];
+	/** Cue bindings: spell id → Lightkey cue. */
+	cues: CueBinding[];
 	lightkey: { host: string; port: number; testAddress: string; testCommand: 'activate' | 'deactivate' | 'toggle' };
 }
 
@@ -69,6 +75,8 @@ export const DEFAULT_SETTINGS: CanvasAssistSettings = {
 	navigatorCollapsed: true,
 	barCollapsed: false,
 	cockpitDoubleClick: true,
+	spells: [],
+	cues: [],
 	lightkey: { host: '127.0.0.1', port: 21600, testAddress: '', testCommand: 'activate' },
 };
 
@@ -77,6 +85,8 @@ export function mergeSettings(raw: unknown): CanvasAssistSettings {
 	if (typeof raw !== 'object' || raw === null) return base;
 	const r = raw as Partial<CanvasAssistSettings>;
 	const out: CanvasAssistSettings = { ...base, ...r, hotkeys: { ...base.hotkeys, ...(r.hotkeys ?? {}) }, lightkey: { ...base.lightkey, ...(r.lightkey ?? {}) } };
+	out.spells = Array.isArray(r.spells) ? r.spells.filter((x): x is SpellCard => !!x && typeof x.id === 'string' && typeof x.name === 'string' && typeof x.level === 'number') : [];
+	out.cues = Array.isArray(r.cues) ? r.cues.filter((x): x is CueBinding => !!x && typeof x.cardId === 'string' && typeof x.address === 'string') : [];
 	out.adventures = Array.isArray(r.adventures)
 		? r.adventures.filter((a): a is RegisteredAdventure => !!a && typeof a.adventureId === 'string' && typeof a.rootPath === 'string')
 		: [];

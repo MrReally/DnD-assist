@@ -21,6 +21,15 @@ export class ObsidianVaultPort implements VaultPort {
 		await this.app.vault.adapter.write(this.n(path), data);
 	}
 
+	async mkdirp(path: string): Promise<void> {
+		const parts = this.n(path).split('/').filter(Boolean);
+		let cur = '';
+		for (const part of parts) {
+			cur = cur ? `${cur}/${part}` : part;
+			if (!(await this.app.vault.adapter.exists(cur))) await this.app.vault.adapter.mkdir(cur);
+		}
+	}
+
 	async process(path: string, fn: (data: string) => string): Promise<string> {
 		return this.app.vault.adapter.process(this.n(path), fn);
 	}

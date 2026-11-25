@@ -11,6 +11,8 @@ export interface VaultPort {
 	exists(path: string): Promise<boolean>;
 	read(path: string): Promise<string>;
 	write(path: string, data: string): Promise<void>;
+	/** Creates a folder and missing parents (no-op if present). */
+	mkdirp(path: string): Promise<void>;
 	/** Read-modify-write; if fn throws, nothing is written. */
 	process(path: string, fn: (data: string) => string): Promise<string>;
 	list(folder: string): Promise<FolderListing>;

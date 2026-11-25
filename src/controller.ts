@@ -4,7 +4,7 @@ import { ObsidianVaultPort } from './adapters/obsidian-vault';
 import { OfflineReference } from './adapters/offline-reference';
 import { TtgLinkProvider, TtgOnlineSearch } from './adapters/ttg-adapter';
 import type { ActionPayload } from './domain/actions';
-import { cardTargetForNote } from './domain/card';
+import { cardTargetForNote, creatureForNote, type CardRef } from './domain/card';
 import { newId } from './domain/ids';
 import { relativeTo } from './domain/normalize';
 import type { ReducerOptions } from './domain/reducer';
@@ -115,6 +115,7 @@ export class Controller {
 
 	setTarget(t: EffectTarget | null): void {
 		if (!this.activeAdventureId) return;
+		this.cardOverride.delete(this.activeAdventureId);
 		this.selection.set(this.activeAdventureId, t);
 		this.emit('selection');
 	}
@@ -125,10 +126,42 @@ export class Controller {
 	/** Opens the game card behind a vault path (a Canvas file node). Returns false if there is none. */
 	openCardForPath(vaultPath: string): boolean {
 		const st = this.state;
-		const t = st ? cardTargetForNote(st, vaultPath) : null;
-		if (!t) return false;
-		this.setTarget(t);
+		if (!st) return false;
+		const t = cardTargetForNote(st, vaultPath);
+		if (t) {
+			this.setTarget(t);
+			return true;
+		}
+		const cr = creatureForNote(st, vaultPath);
+		if (!cr) return false;
+		this.setCard({ kind: 'creature', id: cr });
 		return true;
+	}
+
+	/** Card shown in the GM Panel (UI state). Follows the target unless a bare creature card is opened. */
+	private cardOverride = new Map<string, CardRef | null>();
+
+	get cardRef(): CardRef | null {
+		const id = this.activeAdventureId;
+		if (!id || !this.state) return null;
+		const o = this.cardOverride.get(id);
+		if (o?.kind === 'creature') return this.state.creatures[o.id] ? o : this.target;
+		return this.target;
+	}
+
+	setCard(r: CardRef | null): void {
+		if (!this.activeAdventureId) return;
+		if (r && r.kind !== 'creature') {
+			this.cardOverride.delete(this.activeAdventureId);
+			this.setTarget(r);
+			return;
+		}
+		this.cardOverride.set(this.activeAdventureId, r);
+		this.emit('selection');
+	}
+
+	async saveSettings(): Promise<void> {
+		await this.host.saveSettings();
 	}
 
 	targetName(t: EffectTarget | null = this.target): string {

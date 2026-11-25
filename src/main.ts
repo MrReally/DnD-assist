@@ -1,5 +1,7 @@
 import { Notice, Plugin, requestUrl, type EventRef, type Menu, type WorkspaceLeaf } from 'obsidian';
-import { cardTargetForNote } from './domain/card';
+import { cardTargetForNote, creatureForNote } from './domain/card';
+import { CheckpointModal, goBackToPreviousArea, goToViewPoint, ViewPointsModal } from './ui/cockpit/canvas-modals';
+import { BuilderModal, QuickNpcModal, SpellImportModal } from './ui/cockpit/modals';
 import { watchCanvas } from './adapters/canvas-adapter';
 import { DgramTransport, sendCue } from './adapters/osc-transport';
 import { Controller } from './controller';
@@ -54,7 +56,7 @@ export default class CanvasAssistPlugin extends Plugin {
 			// Canvas node context menu: not in the public typings, so the event name is cast. Absent event → no menu item.
 			(this.app.workspace as unknown as { on: (n: string, cb: (menu: Menu, node: { file?: { path?: string } }) => void) => EventRef }).on('canvas:node-menu', (menu, node) => {
 				const path = node?.file?.path;
-				if (!path || !this.ctl.state || !cardTargetForNote(this.ctl.state, path)) return;
+				if (!path || !this.ctl.state || !(cardTargetForNote(this.ctl.state, path) || creatureForNote(this.ctl.state, path))) return;
 				menu.addItem((i) => i.setTitle('Открыть в GM Cockpit').setIcon('scroll-text').onClick(() => void this.openCockpitFor(path)));
 			}),
 		);
@@ -129,7 +131,7 @@ export default class CanvasAssistPlugin extends Plugin {
 						this.ctl.canvasSelection = paths;
 					},
 					onDoubleClick: (path) => {
-						if (!this.cfg.cockpitDoubleClick || !this.ctl.state || !cardTargetForNote(this.ctl.state, path)) return false;
+						if (!this.cfg.cockpitDoubleClick || !this.ctl.state || !(cardTargetForNote(this.ctl.state, path) || creatureForNote(this.ctl.state, path))) return false;
 						void this.openCockpitFor(path);
 						return true;
 					},
@@ -270,13 +272,25 @@ export default class CanvasAssistPlugin extends Plugin {
 			name: 'Открыть выбранный объект в GM Cockpit',
 			checkCallback: (checking) => {
 				if (!this.ctl.state || !this.inAdventureCanvas()) return false;
-				const path = this.ctl.canvasSelection.find((p) => cardTargetForNote(this.ctl.state!, p));
+				const path = this.ctl.canvasSelection.find((p) => cardTargetForNote(this.ctl.state!, p) || creatureForNote(this.ctl.state!, p));
 				if (!path) return false;
 				if (!checking) void this.openCockpitFor(path);
 				return true;
 			},
 		});
 		this.addCommand({ id: 'lightkey-test', name: 'Lightkey: тестовая отправка', callback: () => void this.testLightkey() });
+		const needCockpit = (fn: () => void) => (checking: boolean): boolean => {
+			if (!this.ctl.state) return false;
+			if (!checking) fn();
+			return true;
+		};
+		this.addCommand({ id: 'cockpit-quick-npc', name: 'Быстрый NPC', checkCallback: needCockpit(() => new QuickNpcModal(this.ctl, (id) => { this.ctl.setCard({ kind: 'creature', id }); void this.openCockpit(); }).open()) });
+		this.addCommand({ id: 'cockpit-new-character', name: 'Новый персонаж (конструктор)', checkCallback: needCockpit(() => new BuilderModal(this.ctl, (id) => { this.ctl.setTarget({ kind: 'character', id }); void this.openCockpit(); }).open()) });
+		this.addCommand({ id: 'cockpit-spell-import', name: 'Заклинание: библиотека и импорт', checkCallback: needCockpit(() => new SpellImportModal(this.ctl, this.ctl.target?.kind === 'character' ? this.ctl.target.id : null, () => undefined).open()) });
+		this.addCommand({ id: 'cockpit-checkpoints', name: 'Контрольные точки Canvas', checkCallback: needCockpit(() => new CheckpointModal(this.ctl).open()) });
+		this.addCommand({ id: 'cockpit-viewpoints', name: 'Точки обзора Canvas', checkCallback: needCockpit(() => new ViewPointsModal(this.ctl).open()) });
+		this.addCommand({ id: 'cockpit-viewpoint-back', name: 'Вернуться в предыдущую область Canvas', checkCallback: needCockpit(() => void goBackToPreviousArea(this.ctl)) });
+		for (let i = 1; i <= 9; i++) this.addCommand({ id: `cockpit-viewpoint-${i}`, name: `Точка обзора ${i}: перейти`, checkCallback: needCockpit(() => void goToViewPoint(this.ctl, String(i))) });
 		this.addCommand({ id: 'open-panel', name: 'Открыть панель', callback: () => void this.openPanel() });
 		this.addCommand({ id: 'search-canvas', name: 'Поиск по текущему Canvas', checkCallback: (c) => {
 			const o = this.activeOverlay();

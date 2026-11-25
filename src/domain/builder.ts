@@ -1,5 +1,5 @@
 // Character builder (by rules, 2014 SRD data) and quick NPC creation. Pure; ids and randomness are injected.
-import { ABILITIES, abilityMod, cockpitOf, emptySheet, profByLevel, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
+import { ABILITIES, abilityMod, cockpitOf, emptySheet, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
 import { CLASSES, CREATURE_TEMPLATES, ITEM_TYPES, RACES, spellSlotsFor, type ClassDef, type CreatureTemplate } from './srd-data';
 import { emptyCharacter } from './state';
 import type { AbilityId, AdventureState, CharacterState, CreatureCard } from './types';
@@ -81,7 +81,6 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 	const conMod = abilityMod(abilities.con);
 	const avg = Math.floor(cls.hitDie / 2) + 1;
 	const hp = ch.hpOverride ?? Math.max(1, cls.hitDie + conMod + (level - 1) * Math.max(1, avg + conMod));
-	const prof = profByLevel(level);
 
 	const character = emptyCharacter(newId('pc'), ch.name.trim() || 'Новый персонаж', ch.notePath);
 	character.classes = [{ name: cls.ru, level }];

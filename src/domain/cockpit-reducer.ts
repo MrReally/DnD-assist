@@ -117,7 +117,10 @@ export function reduceCockpit(s: AdventureState, a: Action): void {
 			let grew = true;
 			while (grew) {
 				grew = false;
-				for (const it of Object.values(c.items)) if (it.containerId && doomed.has(it.containerId) && !doomed.has(it.id)) (doomed.add(it.id), (grew = true));
+				for (const it of Object.values(c.items)) if (it.containerId && doomed.has(it.containerId) && !doomed.has(it.id)) {
+					doomed.add(it.id);
+					grew = true;
+				}
 			}
 			for (const id of doomed) delete c.items[id];
 			return;

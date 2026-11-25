@@ -18,6 +18,11 @@ interface LiveCanvas {
 	zoomToSelection?: () => void;
 	zoomToBbox?: (bbox: unknown) => void;
 	deselectAll?: () => void;
+	tx?: number;
+	ty?: number;
+	tZoom?: number;
+	setViewport?: (x: number, y: number, zoom: number) => void;
+	requestSave?: () => void;
 }
 
 function liveCanvas(view: View | null): LiveCanvas | null {
@@ -154,4 +159,39 @@ export function watchCanvas(view: View, h: CanvasWatchHandlers): () => void {
 		host.removeEventListener('keyup', read, true);
 		host.removeEventListener('dblclick', dbl, true);
 	};
+}
+
+// ---- view points (spike S4) ----------------------------------------------------------------------
+
+export interface Viewport {
+	x: number;
+	y: number;
+	zoom: number;
+}
+
+export function getViewport(view: View | null): Viewport | null {
+	const c = liveCanvas(view);
+	if (!c || typeof c.tx !== 'number' || typeof c.ty !== 'number' || typeof c.tZoom !== 'number') return null;
+	return { x: c.tx, y: c.ty, zoom: c.tZoom };
+}
+
+/** Moves the Canvas camera. Returns false (never throws) when the internal API is unavailable. */
+export function setViewport(view: View | null, v: Viewport): boolean {
+	const c = liveCanvas(view);
+	if (!c || typeof c.setViewport !== 'function') return false;
+	try {
+		c.setViewport(v.x, v.y, v.zoom);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Asks Canvas to flush pending edits to disk (best effort). */
+export function requestCanvasSave(view: View | null): void {
+	try {
+		(liveCanvas(view))?.requestSave?.();
+	} catch {
+		// optional
+	}
 }
