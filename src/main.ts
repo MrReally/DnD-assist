@@ -182,10 +182,16 @@ export default class CanvasAssistPlugin extends Plugin {
 		if (!leaf) return;
 		await leaf.setViewState({ type: COCKPIT_VIEW, active: true });
 		await this.app.workspace.revealLeaf(leaf);
-		// SPEC §1: the GM Panel is at least 340 px. Obsidian's default sidebar is 300 px; the user may resize it afterwards.
-		const split = this.app.workspace.rightSplit as unknown as { setSize?: (n: number) => void; containerEl?: HTMLElement };
-		const w = split.containerEl?.getBoundingClientRect().width ?? 0;
-		if (w > 0 && w < 340) split.setSize?.(340);
+		// SPEC §1: the GM Panel is 340/380/420 px by screen size. Obsidian's default sidebar is 300 px; the user may resize it afterwards.
+		window.setTimeout(() => {
+			const split = this.app.workspace.rightSplit as unknown as { setSize?: (n: number) => void; size?: number; containerEl?: HTMLElement };
+			const w = split.containerEl?.getBoundingClientRect().width ?? 0;
+			const target = window.innerWidth >= 1800 ? 420 : window.innerWidth >= 1400 ? 380 : 340;
+			if (w < target) {
+				if (typeof split.setSize === 'function') split.setSize(target);
+				else split.size = target;
+			}
+		}, 150);
 	}
 
 	/** Test send of the configured cue. Reports the outcome; never claims the light changed. */

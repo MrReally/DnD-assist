@@ -336,7 +336,7 @@ export class GmCockpitPanel extends ItemView {
 		const kv = (k: string, v: string, id?: string): void => {
 			const r = card.createDiv({ cls: 'gmc-kv' });
 			r.createSpan({ cls: 'gmc-dim', text: k });
-			r.createSpan({ cls: 'gmc-num', text: v, ...(id ? { attr: { 'data-testid': id } } : {}) });
+			r.createSpan({ cls: v.length <= 10 ? 'gmc-num' : 'gmc-val', text: v, ...(id ? { attr: { 'data-testid': id } } : {}) });
 		};
 		kv('Стоимость', type ? formatCost(type.costCp) : '—', 'gmc-w-cost');
 		kv('Вес', type ? formatWeight(type.weight) : '—', 'gmc-w-weight');

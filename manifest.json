@@ -1,7 +1,7 @@
 {
 	"id": "canvas-assist",
 	"name": "D&D Canvas Assist",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"minAppVersion": "1.7.2",
 	"description": "Lightweight D&D 5e (2014) GM assistant on top of Canvas: search & navigation, initiative tracker, HP/resources, event-based effect timers, rests, JSON character import. Russian UI.",
 	"author": "Canvas Assist contributors",

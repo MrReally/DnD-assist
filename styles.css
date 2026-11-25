@@ -803,3 +803,15 @@ body {
 .modal .gmc-vp { display: grid; grid-template-columns: 20px 1fr auto auto auto; gap: 6px; align-items: center; margin-bottom: 4px; }
 .modal .gmc-items { display: flex; flex-direction: column; gap: 4px; }
 .modal .gmc-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; }
+
+/* specificity fixes: Obsidian styles input[type=text|number] directly */
+.gmc input.gmc-input, .modal input.gmc-input, .modal textarea.gmc-input { background: #120f0c; color: #ece2cb; border: 1px solid #4a3f31; border-radius: 8px; height: 34px; box-shadow: none; }
+.gmc input.gmc-input::placeholder { color: #968b76; font-size: 12px; }
+.gmc input.gmc-input:focus-visible { outline: 2px solid #9a94ec; outline-offset: 2px; }
+.modal textarea.gmc-input { height: auto; }
+.gmc input.gmc-input.is-error { border-color: #b34a3f; }
+.gmc-foot { flex-wrap: wrap; }
+.gmc-item .gmc-row { flex-wrap: wrap; }
+.gmc .gmc-btn, .gmc .gmc-btn-text { white-space: nowrap; }
+.gmc-attack-name { overflow: hidden; text-overflow: ellipsis; }
+.gmc-val { text-align: right; font-weight: 500; max-width: 70%; }
