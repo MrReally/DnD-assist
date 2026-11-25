@@ -1,7 +1,7 @@
 // The ONLY place that touches the live (undocumented) Canvas view internals.
 // Official canvas.d.ts describes the JSON file format only, so every live operation is
 // capability-probed at call time and falls back to public API behaviour.
-import type { View } from 'obsidian';
+import type { TFile, View } from 'obsidian';
 
 export interface CanvasCapabilities {
 	canFocusNode: boolean;
@@ -23,6 +23,8 @@ interface LiveCanvas {
 	tZoom?: number;
 	setViewport?: (x: number, y: number, zoom: number) => void;
 	requestSave?: () => void;
+	createFileNode?: (opts: { file: unknown; pos: { x: number; y: number }; size?: { width: number; height: number }; save?: boolean; focus?: boolean }) => unknown;
+	posCenter?: () => { x: number; y: number };
 }
 
 function liveCanvas(view: View | null): LiveCanvas | null {
@@ -193,5 +195,24 @@ export function requestCanvasSave(view: View | null): void {
 		(liveCanvas(view))?.requestSave?.();
 	} catch {
 		// optional
+	}
+}
+
+// ---- explicit "add to Canvas" (spec §3.6: never automatic) ---------------------------------------------
+
+/**
+ * Adds a file node at the centre of the current view through Canvas' own node factory, so Obsidian itself
+ * writes the .canvas file (the plugin never edits the JSON). Returns false when the internal API is missing.
+ */
+export function addFileNode(view: View | null, file: TFile): boolean {
+	const c = liveCanvas(view);
+	if (!c || typeof c.createFileNode !== 'function') return false;
+	try {
+		const p = typeof c.posCenter === 'function' ? c.posCenter() : { x: 0, y: 0 };
+		c.createFileNode({ file, pos: { x: p.x - 130, y: p.y - 70 }, size: { width: 260, height: 140 }, save: true, focus: false });
+		c.requestSave?.();
+		return true;
+	} catch {
+		return false;
 	}
 }

@@ -1,6 +1,9 @@
 import { Notice, Plugin, requestUrl, type EventRef, type Menu, type WorkspaceLeaf } from 'obsidian';
 import { cardTargetForNote, creatureForNote } from './domain/card';
+import { relativeTo } from './domain/normalize';
+import { isRoomNote } from './domain/room';
 import { CheckpointModal, goBackToPreviousArea, goToViewPoint, ViewPointsModal } from './ui/cockpit/canvas-modals';
+import { GoToModal } from './ui/cockpit/goto-modal';
 import { BuilderModal, QuickNpcModal, SpellImportModal } from './ui/cockpit/modals';
 import { watchCanvas } from './adapters/canvas-adapter';
 import { DgramTransport, sendCue } from './adapters/osc-transport';
@@ -47,6 +50,7 @@ export default class CanvasAssistPlugin extends Plugin {
 			},
 		});
 		this.registerView(PANEL_VIEW, (leaf) => new CanvasAssistPanel(leaf, this.ctl));
+		this.ctl.showPanel = () => void this.openCockpit();
 		this.registerView(COCKPIT_VIEW, (leaf) => new GmCockpitPanel(leaf, this.ctl));
 		this.addSettingTab(new CanvasAssistSettingTab(this.app, this, this.ctl, () => this.saveSettings(), () => this.testLightkey()));
 		this.registerCommands();
@@ -56,7 +60,7 @@ export default class CanvasAssistPlugin extends Plugin {
 			// Canvas node context menu: not in the public typings, so the event name is cast. Absent event → no menu item.
 			(this.app.workspace as unknown as { on: (n: string, cb: (menu: Menu, node: { file?: { path?: string } }) => void) => EventRef }).on('canvas:node-menu', (menu, node) => {
 				const path = node?.file?.path;
-				if (!path || !this.ctl.state || !(cardTargetForNote(this.ctl.state, path) || creatureForNote(this.ctl.state, path))) return;
+				if (!path || !this.ctl.state || !this.hasCard(path)) return;
 				menu.addItem((i) => i.setTitle('Открыть в GM Cockpit').setIcon('scroll-text').onClick(() => void this.openCockpitFor(path)));
 			}),
 		);
@@ -131,7 +135,7 @@ export default class CanvasAssistPlugin extends Plugin {
 						this.ctl.canvasSelection = paths;
 					},
 					onDoubleClick: (path) => {
-						if (!this.cfg.cockpitDoubleClick || !this.ctl.state || !(cardTargetForNote(this.ctl.state, path) || creatureForNote(this.ctl.state, path))) return false;
+						if (!this.cfg.cockpitDoubleClick || !this.ctl.state || !this.hasCard(path)) return false;
 						void this.openCockpitFor(path);
 						return true;
 					},
@@ -158,6 +162,15 @@ export default class CanvasAssistPlugin extends Plugin {
 		await this.app.workspace.revealLeaf(leaf);
 	}
 
+	/** True when a Canvas file node maps to a card (character, creature, room note). */
+	private hasCard(path: string): boolean {
+		const st = this.ctl.state;
+		if (!st) return false;
+		if (cardTargetForNote(st, path) || creatureForNote(st, path)) return true;
+		const rel = relativeTo(st.rootPath, path);
+		return !!rel && isRoomNote(rel);
+	}
+
 	/** Opens (or reveals) the GM Cockpit panel in the right sidebar. */
 	async openCockpit(): Promise<void> {
 		const existing = this.app.workspace.getLeavesOfType(COCKPIT_VIEW)[0];
@@ -169,6 +182,10 @@ export default class CanvasAssistPlugin extends Plugin {
 		if (!leaf) return;
 		await leaf.setViewState({ type: COCKPIT_VIEW, active: true });
 		await this.app.workspace.revealLeaf(leaf);
+		// SPEC §1: the GM Panel is at least 340 px. Obsidian's default sidebar is 300 px; the user may resize it afterwards.
+		const split = this.app.workspace.rightSplit as unknown as { setSize?: (n: number) => void; containerEl?: HTMLElement };
+		const w = split.containerEl?.getBoundingClientRect().width ?? 0;
+		if (w > 0 && w < 340) split.setSize?.(340);
 	}
 
 	/** Test send of the configured cue. Reports the outcome; never claims the light changed. */
@@ -272,7 +289,7 @@ export default class CanvasAssistPlugin extends Plugin {
 			name: 'Открыть выбранный объект в GM Cockpit',
 			checkCallback: (checking) => {
 				if (!this.ctl.state || !this.inAdventureCanvas()) return false;
-				const path = this.ctl.canvasSelection.find((p) => cardTargetForNote(this.ctl.state!, p) || creatureForNote(this.ctl.state!, p));
+				const path = this.ctl.canvasSelection.find((p) => this.hasCard(p));
 				if (!path) return false;
 				if (!checking) void this.openCockpitFor(path);
 				return true;
@@ -287,6 +304,7 @@ export default class CanvasAssistPlugin extends Plugin {
 		this.addCommand({ id: 'cockpit-quick-npc', name: 'Быстрый NPC', checkCallback: needCockpit(() => new QuickNpcModal(this.ctl, (id) => { this.ctl.setCard({ kind: 'creature', id }); void this.openCockpit(); }).open()) });
 		this.addCommand({ id: 'cockpit-new-character', name: 'Новый персонаж (конструктор)', checkCallback: needCockpit(() => new BuilderModal(this.ctl, (id) => { this.ctl.setTarget({ kind: 'character', id }); void this.openCockpit(); }).open()) });
 		this.addCommand({ id: 'cockpit-spell-import', name: 'Заклинание: библиотека и импорт', checkCallback: needCockpit(() => new SpellImportModal(this.ctl, this.ctl.target?.kind === 'character' ? this.ctl.target.id : null, () => undefined).open()) });
+		this.addCommand({ id: 'cockpit-goto', name: 'Перейти (Canvas и справочник)', checkCallback: needCockpit(() => new GoToModal(this.ctl).open()) });
 		this.addCommand({ id: 'cockpit-checkpoints', name: 'Контрольные точки Canvas', checkCallback: needCockpit(() => new CheckpointModal(this.ctl).open()) });
 		this.addCommand({ id: 'cockpit-viewpoints', name: 'Точки обзора Canvas', checkCallback: needCockpit(() => new ViewPointsModal(this.ctl).open()) });
 		this.addCommand({ id: 'cockpit-viewpoint-back', name: 'Вернуться в предыдущую область Canvas', checkCallback: needCockpit(() => void goBackToPreviousArea(this.ctl)) });

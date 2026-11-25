@@ -5,6 +5,7 @@ import { OfflineReference } from './adapters/offline-reference';
 import { TtgLinkProvider, TtgOnlineSearch } from './adapters/ttg-adapter';
 import type { ActionPayload } from './domain/actions';
 import { cardTargetForNote, creatureForNote, type CardRef } from './domain/card';
+import { isRoomNote } from './domain/room';
 import { newId } from './domain/ids';
 import { relativeTo } from './domain/normalize';
 import type { ReducerOptions } from './domain/reducer';
@@ -120,6 +121,9 @@ export class Controller {
 		this.emit('selection');
 	}
 
+	/** Set by the plugin: reveals the GM Cockpit panel. */
+	showPanel: () => void = () => undefined;
+
 	/** Canvas selection mirrored by the Canvas binding (UI state only; never persisted). */
 	canvasSelection: string[] = [];
 
@@ -133,9 +137,16 @@ export class Controller {
 			return true;
 		}
 		const cr = creatureForNote(st, vaultPath);
-		if (!cr) return false;
-		this.setCard({ kind: 'creature', id: cr });
-		return true;
+		if (cr) {
+			this.setCard({ kind: 'creature', id: cr });
+			return true;
+		}
+		const rel = relativeTo(st.rootPath, vaultPath);
+		if (rel && isRoomNote(rel)) {
+			this.setCard({ kind: 'room', id: vaultPath });
+			return true;
+		}
+		return false;
 	}
 
 	/** Card shown in the GM Panel (UI state). Follows the target unless a bare creature card is opened. */
@@ -146,12 +157,13 @@ export class Controller {
 		if (!id || !this.state) return null;
 		const o = this.cardOverride.get(id);
 		if (o?.kind === 'creature') return this.state.creatures[o.id] ? o : this.target;
+		if (o?.kind === 'room') return o;
 		return this.target;
 	}
 
 	setCard(r: CardRef | null): void {
 		if (!this.activeAdventureId) return;
-		if (r && r.kind !== 'creature') {
+		if (r && r.kind !== 'creature' && r.kind !== 'room') {
 			this.cardOverride.delete(this.activeAdventureId);
 			this.setTarget(r);
 			return;

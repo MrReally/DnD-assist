@@ -748,3 +748,58 @@ body {
 .gmc-vp { display: grid; grid-template-columns: 20px 1fr auto auto auto; gap: 6px; align-items: center; margin-bottom: 4px; }
 .gmc-effects { display: flex; flex-wrap: wrap; gap: 4px; }
 .gmc-body { min-height: 0; }
+.gmc-hidden { background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(224,169,74,.08) 6px 12px); border: 1px dashed var(--warn); border-radius: 6px; padding: 6px; }
+.gmc-hidden-tag { color: var(--warn); font-weight: 600; font-size: 12px; }
+.gmc-md { padding: 4px 0; }
+.gmc-md p { margin: 4px 0; }
+
+/* Brass Atlas is always dark: remap Obsidian variables inside the panel so reused Canvas Assist pieces stay readable in any theme. */
+.gmc {
+	--text-normal: #ece2cb;
+	--text-muted: #bcb097;
+	--text-faint: #968b76;
+	--text-warning: #e0a94a;
+	--ca-warn-text: #e0a94a;
+	--background-modifier-hover: #2b251d;
+	--background-modifier-border: #4a3f31;
+	--background-primary: #1a1612;
+	--background-secondary: #221d17;
+}
+.gmc .gmc-btn-p:hover { background: #d8b56e; border-color: #d8b56e; color: #1b1408; }
+.gmc .gmc-btn-p:active { background: #b38f4d; }
+.gmc-parch .gmc-btn { background: #d6c9a9; border-color: #8f7541; color: #2b2217; }
+.gmc-parch .gmc-btn:hover { background: #cdbf9b; }
+.gmc-parch .gmc-btn-g { background: transparent; border-color: transparent; color: #5a4a33; }
+.gmc-parch .gmc-btn-p { background: #8f7541; border-color: #8f7541; color: #fff8e6; }
+.gmc-parch .gmc-btn-p:hover { background: #7a6336; border-color: #7a6336; color: #fff8e6; }
+.gmc-parch .gmc-btn-a { background: #26233f; color: #cfcbff; }
+.gmc-parch .gmc-btn.is-on { border-color: #2b2217; color: #2b2217; font-weight: 600; }
+.gmc-parch .gmc-btn:disabled { opacity: 0.5; }
+.gmc-dock { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.gmc-chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 8px; background: var(--bg0); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 12px; }
+.gmc-chip:hover { border-color: var(--brass2); }
+.gmc-chip.is-sel { border-color: var(--brass); box-shadow: 0 0 0 1px var(--brass) inset; }
+.gmc-chip.is-low .gmc-chip-hp { color: var(--hpt); font-weight: 600; }
+.gmc-chip:focus-visible { outline: 2px solid var(--arc); outline-offset: 1px; }
+.gmc-chip-name { font-weight: 600; }
+.gmc-goto-group { margin-top: 10px; }
+.gmc-goto-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; margin-top: 4px; }
+.gmc-goto-title { display: flex; flex-direction: column; min-width: 0; }
+.modal .gmc-input { width: 100%; }
+.modal .gmc-btn, .modal .gmc-eyebrow, .modal .gmc-dim, .modal .gmc-warn, .modal .gmc-check, .modal .gmc-pickrow, .modal .gmc-abilgrid { font-family: var(--font-interface); }
+.modal .gmc-dim { color: var(--text-muted); font-size: 12px; }
+.modal .gmc-warn { color: var(--text-warning); }
+.modal .gmc-btn { height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--background-modifier-border); background: var(--interactive-normal); color: var(--text-normal); cursor: pointer; }
+.modal .gmc-btn:hover { background: var(--interactive-hover); }
+.modal .gmc-btn-p { background: #c9a45c; border-color: #c9a45c; color: #1b1408; font-weight: 600; }
+.modal .gmc-btn-ok { background: #1f2b1c; border-color: #3c5a35; color: #86b07a; }
+.modal .gmc-btn-d { background: #3a1d19; border-color: #6b2f28; color: #ea8c80; }
+.modal .gmc-btn.is-on { border-color: #c9a45c; color: #8f7541; font-weight: 600; }
+.modal .gmc-abilgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.modal .gmc-row { display: flex; align-items: center; }
+.modal .gmc-gap { gap: 6px; }
+.modal .gmc-wrap { flex-wrap: wrap; }
+.modal .gmc-pick { display: flex; flex-direction: column; gap: 2px; }
+.modal .gmc-vp { display: grid; grid-template-columns: 20px 1fr auto auto auto; gap: 6px; align-items: center; margin-bottom: 4px; }
+.modal .gmc-items { display: flex; flex-direction: column; gap: 4px; }
+.modal .gmc-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; }

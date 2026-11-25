@@ -1,7 +1,8 @@
 // GM Cockpit panel: one primary card at a time (character / NPC / monster), with weapon, inventory,
 // spell and full-sheet views behind it. Native DOM only. Every edit goes through Controller.act()
 // (same reducer, Undo/Redo and sidecar persistence as the rest of Canvas Assist).
-import { ItemView, Notice, type WorkspaceLeaf } from 'obsidian';
+import { ItemView, MarkdownRenderer, Notice, TFile, type WorkspaceLeaf } from 'obsidian';
+import { parseRoom } from '../domain/room';
 import { sendCue, DgramTransport } from '../adapters/osc-transport';
 import { hpPercent, modText, parseHpInput, resolveCard, weaponItemsOf, type AttackRow, type CardModel } from '../domain/card';
 import { resolveItemType } from '../domain/builder';
@@ -17,6 +18,7 @@ import { addCreatureToCombat, AddItemModal, BuilderModal, CueModal, QuickNpcModa
 import { effectsFor, renderEffectPills } from './overlay';
 import { RestModal } from './rest-modal';
 import { CheckpointModal, ViewPointsModal } from './cockpit/canvas-modals';
+import { GoToModal } from './cockpit/goto-modal';
 
 export const COCKPIT_VIEW = 'gm-cockpit-panel';
 
@@ -105,7 +107,8 @@ export class GmCockpitPanel extends ItemView {
 		const body = root.createDiv({ cls: 'gmc-body' });
 		const model = ref ? resolveCard(state, ref) : null;
 		try {
-			if (!model) {
+			if (ref?.kind === 'room') void this.renderRoom(body, ref.id);
+			else if (!model) {
 				const e = body.createDiv({ cls: 'gmc-empty', attr: { 'data-testid': 'gmc-empty' } });
 				e.createEl('p', { text: 'Карточка не выбрана.' });
 				e.createEl('p', { cls: 'gmc-dim', text: 'Двойной клик по узлу персонажа или NPC на Canvas, команда «Открыть выбранный объект в GM Cockpit» либо кнопки «NPC» и «Персонаж» выше.' });
@@ -128,12 +131,39 @@ export class GmCockpitPanel extends ItemView {
 		top.createEl('h3', { text: state?.name ?? 'GM Cockpit', cls: 'gmc-serif' });
 		if (!state) return;
 		const tools = head.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap gmc-tools' });
+		button(tools, 'Перейти', () => new GoToModal(this.ctl).open(), { icon: 'search', cls: 'gmc-btn gmc-btn-sm', title: 'Поиск по Canvas и справочнику', testId: 'gmc-goto' });
 		button(tools, 'NPC', () => new QuickNpcModal(this.ctl, (id) => this.ctl.setCard({ kind: 'creature', id })).open(), { icon: 'user-plus', cls: 'gmc-btn gmc-btn-sm', title: 'Быстрый NPC', testId: 'gmc-new-npc' });
 		button(tools, 'Персонаж', () => new BuilderModal(this.ctl, (id) => this.ctl.setTarget({ kind: 'character', id })).open(), { icon: 'user', cls: 'gmc-btn gmc-btn-sm', title: 'Новый персонаж', testId: 'gmc-new-pc' });
 		button(tools, 'Отдых', () => new RestModal(this.ctl, 'short').open(), { icon: 'tent', cls: 'gmc-btn gmc-btn-sm', title: 'Короткий отдых', testId: 'gmc-rest-short' });
 		button(tools, 'Ночь', () => new RestModal(this.ctl, 'long').open(), { icon: 'moon', cls: 'gmc-btn gmc-btn-sm', title: 'Продолжительный отдых', testId: 'gmc-rest-long' });
 		button(tools, 'Точки', () => new ViewPointsModal(this.ctl).open(), { icon: 'map-pin', cls: 'gmc-btn gmc-btn-sm', title: 'Точки обзора Canvas', testId: 'gmc-viewpoints' });
 		button(tools, 'Контр.', () => new CheckpointModal(this.ctl).open(), { icon: 'archive', cls: 'gmc-btn gmc-btn-sm', title: 'Контрольные точки Canvas', testId: 'gmc-checkpoints' });
+		this.renderParty(head, state);
+	}
+
+	/** PartyDock: compact always-visible party row (HP, AC); click opens the card. */
+	private renderParty(head: HTMLElement, state: NonNullable<Controller['state']>): void {
+		const party = state.parties.find((p) => p.id === state.activePartyId);
+		const ids = party ? party.characterIds : Object.keys(state.characters);
+		const chars = ids.map((id) => state.characters[id]).filter((c): c is NonNullable<typeof c> => !!c);
+		if (!chars.length) return;
+		const dock = head.createDiv({ cls: 'gmc-dock', attr: { 'data-testid': 'gmc-party', role: 'list', 'aria-label': 'Партия' } });
+		const cur = this.ctl.cardRef;
+		for (const c of chars) {
+			const sel = cur?.kind === 'character' && cur.id === c.id;
+			const chip = dock.createDiv({ cls: ['gmc-chip', sel ? 'is-sel' : '', c.hp.max !== null && c.hp.current <= c.hp.max / 4 ? 'is-low' : ''].filter(Boolean), attr: { role: 'listitem', tabindex: '0', 'data-testid': `gmc-party-${c.id}`, 'aria-label': `${c.name}, хиты ${c.hp.current} из ${c.hp.max ?? '?'}` } });
+			chip.createSpan({ cls: 'gmc-chip-name', text: c.name });
+			chip.createSpan({ cls: 'gmc-chip-hp', text: `${c.hp.current}/${c.hp.max ?? '?'}` });
+			if (c.ac !== null) chip.createSpan({ cls: 'gmc-dim', text: `КД ${c.ac}` });
+			const open = (): void => this.ctl.setTarget({ kind: 'character', id: c.id });
+			chip.addEventListener('click', open);
+			chip.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					open();
+				}
+			});
+		}
 	}
 
 	private renderFooter(root: HTMLElement): void {
@@ -478,6 +508,27 @@ export class GmCockpitPanel extends ItemView {
 			card.createDiv({ cls: 'gmc-dim', text: `Источник: ${{ official: 'официальный', adapted: 'адаптированный', generated: 'сгенерированный', custom: 'пользовательский' }[sb.origin]} · ${sb.sourceNote}` });
 		}
 		void profBonusOf;
+	}
+
+	private async renderRoom(body: HTMLElement, path: string): Promise<void> {
+		const f = this.app.vault.getAbstractFileByPath(path);
+		const card = body.createDiv({ cls: 'gmc-card', attr: { 'data-testid': 'gmc-room' } });
+		if (!(f instanceof TFile)) return void card.createDiv({ cls: 'gmc-warn', text: 'Заметка помещения не найдена (удалена или перемещена).' });
+		const md = await this.app.vault.cachedRead(f);
+		const room = parseRoom(md, f.basename);
+		card.createEl('h4', { text: room.title, cls: 'gmc-serif gmc-name', attr: { 'data-testid': 'gmc-room-title' } });
+		card.createDiv({ cls: 'gmc-dim', text: 'Справочная карточка помещения' });
+		if (room.intro) await MarkdownRenderer.render(this.app, room.intro, card.createDiv({ cls: 'gmc-md' }), f.path, this);
+		for (const s of room.sections) {
+			const d = card.createEl('details', { cls: `gmc-sec ${s.hidden ? 'gmc-hidden' : ''}`, attr: { 'data-testid': s.hidden ? 'gmc-room-hidden' : 'gmc-room-sec' } });
+			d.setAttr('open', '');
+			const sum = d.createEl('summary');
+			if (s.hidden) sum.createSpan({ cls: 'gmc-hidden-tag', text: '🔒 скрыто' });
+			sum.createSpan({ text: ` ${s.heading}` });
+			if (s.body) await MarkdownRenderer.render(this.app, s.body, d.createDiv({ cls: 'gmc-md' }), f.path, this);
+		}
+		const row = card.createDiv({ cls: 'gmc-row gmc-gap' });
+		button(row, 'Открыть заметку', () => void this.app.workspace.getLeaf('tab').openFile(f), { icon: 'file-text', cls: 'gmc-btn gmc-btn-g', testId: 'gmc-room-note' });
 	}
 
 	// ---- spells --------------------------------------------------------------------------------

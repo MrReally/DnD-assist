@@ -4,7 +4,7 @@ import { relativeTo } from './normalize';
 import type { AdventureState, CharacterState, EffectTarget } from './types';
 
 /** What the GM Panel shows: a character, a combatant, or a bare creature card (not in combat). */
-export type CardRef = EffectTarget | { kind: 'creature'; id: string };
+export type CardRef = EffectTarget | { kind: 'creature'; id: string } | { kind: 'room'; id: string };
 
 /** Character whose sheet note is `vaultPath`, or null (outside the adventure root, unknown note). */
 export function characterForNote(state: AdventureState, vaultPath: string): CharacterState | null {
@@ -101,6 +101,7 @@ export function weaponItemsOf(state: AdventureState, owner: Owner): Array<{ item
 /** Everything a compact card needs, derived from state only (pure, unit-tested). */
 export function resolveCard(state: AdventureState, target: CardRef): CardModel | null {
 	const c = cockpitOf(state);
+	if (target.kind === 'room') return null;
 	if (target.kind === 'creature') return resolveCreature(state, target.id);
 	const cmb = target.kind === 'combatant' ? state.activeEncounter?.combatants[target.id] : undefined;
 	if (target.kind === 'combatant' && !cmb) return null;
