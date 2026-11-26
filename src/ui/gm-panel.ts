@@ -517,13 +517,13 @@ export class GmCockpitPanel extends ItemView {
 				for (const r of cls.levels.filter((x) => x.level <= Math.max(1, m.level))) if (r.features.length) cf.createDiv({ text: `${r.level} ур.: ${r.features.join(', ')}` });
 				cf.createDiv({ cls: 'gmc-dim', text: 'Названия из таблицы класса SRD 5.1; описания — в справочнике SRD. Неполная поддержка: автоматически считаются только перечисленные в конструкторе ресурсы.' });
 			}
-			const sc = srd?.subclasses.find((x) => x.classId === sh.classId && x.name === sh.subclass.trim());
-			if (sc) {
-				const sd = sec(`Подкласс: ${sc.name} (SRD)`);
-				for (const f of sc.features) sd.createDiv({ cls: f.level <= m.level ? '' : 'gmc-dim', text: `${f.level} ур.: ${f.name}${f.level <= m.level ? '' : ' (ещё не получена)'}` });
+			const subc = srd?.subclasses.find((x) => x.classId === sh.classId && x.name === sh.subclass.trim());
+			if (subc) {
+				const sd = sec(`Подкласс: ${subc.name} (SRD)`);
+				for (const f of subc.features) sd.createDiv({ cls: f.level <= m.level ? '' : 'gmc-dim', text: `${f.level} ур.: ${f.name}${f.level <= m.level ? '' : ' (ещё не получена)'}` });
 				const txt = sd.createEl('details');
 				txt.createEl('summary', { text: 'Текст SRD (английский)' });
-				txt.createDiv({ cls: 'gmc-spell-text', text: sc.text });
+				txt.createDiv({ cls: 'gmc-spell-text', text: subc.text });
 			} else if (sh.subclass.trim()) card.createDiv({ cls: 'gmc-dim', text: `Подкласс «${sh.subclass.trim()}» вне SRD — особенности вводятся вручную.` });
 			const ch = st.characters[id];
 			if (ch) button(card, 'Повысить уровень', () => new LevelUpModal(this.ctl, id).open(), { icon: 'arrow-up', cls: 'gmc-btn', testId: 'gmc-levelup' });
