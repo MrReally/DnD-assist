@@ -1,3 +1,4 @@
+import { arcaneRecoveryBudget, arcaneRecoveryError } from './class-rules';
 import type { AdventureState, CharacterState } from './types';
 
 export type RestKind = 'short' | 'long';
@@ -17,6 +18,10 @@ export interface RestOptions {
 	/** characterId -> manual hit dice spending on short rest (physical rolls). */
 	hitDiceSpend: Record<string, { die: string; count: number; healed: number }>;
 	removeEffectIds: string[];
+	/** Wizard Arcane Recovery on a short rest: characterId → slot levels recovered (the player's choice). */
+	arcaneRecovery?: Record<string, number[]>;
+	/** Warlock Pact Magic: slots return on a short rest (default true when the character has it). */
+	pactMagic?: boolean;
 }
 
 export interface RestPlanEntry {
@@ -25,6 +30,8 @@ export interface RestPlanEntry {
 	before: CharacterState;
 	after: CharacterState;
 	lines: string[];
+	/** Rule violations that block applying this rest (e.g. Arcane Recovery over budget). */
+	errors: string[];
 }
 
 export interface RestPlan {
@@ -47,7 +54,7 @@ export function defaultRestOptions(
 		if (!ch) continue;
 		counterIds[id] = auto
 			? Object.values(ch.counters)
-					.filter((c) => c.recovery === 'short' || (kind === 'long' && c.recovery === 'long'))
+					.filter((c) => c.recovery === 'short' || (kind === 'long' && (c.recovery === 'long' || c.id === 'arcane-recovery')))
 					.map((c) => c.id)
 			: [];
 	}
@@ -73,6 +80,7 @@ export function planRest(state: AdventureState, opts: RestOptions): RestPlan {
 		if (!before) continue;
 		const after = structuredClone(before);
 		const lines: string[] = [];
+		const errors: string[] = [];
 
 		const spend = opts.hitDiceSpend[id];
 		if (opts.kind === 'short' && spend && spend.count > 0) {
@@ -101,6 +109,39 @@ export function planRest(state: AdventureState, opts: RestOptions): RestPlan {
 				}
 			}
 		}
+		if (opts.kind === 'short' && opts.pactMagic !== false && after.extensions?.pactMagic === true) {
+			for (const [lvl, slot] of Object.entries(after.spellSlots)) {
+				if (slot.current !== slot.max) {
+					lines.push(`Магия договора, ячейки ${lvl} ур.: ${slot.current} → ${slot.max}`);
+					slot.current = slot.max;
+				}
+			}
+		}
+		const arc = opts.arcaneRecovery?.[id];
+		if (opts.kind === 'short' && arc && arc.length) {
+			const wiz = after.classes.find((k) => k.name === 'Волшебник');
+			const counter = after.counters['arcane-recovery'];
+			if (!wiz) errors.push('Магическое восстановление доступно только волшебнику');
+			else if (!counter || counter.current < 1) errors.push('Магическое восстановление уже использовано сегодня');
+			else {
+				const err = arcaneRecoveryError(arc, wiz.level);
+				if (err) errors.push(err);
+				else {
+					for (const l of arc) {
+						const slot = after.spellSlots[String(l)];
+						if (!slot || slot.current >= slot.max) errors.push(`Нет израсходованной ячейки ${l} уровня`);
+						else {
+							lines.push(`Магическое восстановление, ячейки ${l} ур.: ${slot.current} → ${slot.current + 1}`);
+							slot.current += 1;
+						}
+					}
+					if (!errors.length) {
+						counter.current = 0;
+						lines.push(`${counter.name}: использовано (бюджет ${arcaneRecoveryBudget(wiz.level)})`);
+					}
+				}
+			}
+		}
 		if (opts.restoreHitDice && opts.kind === 'long') {
 			for (const hd of after.hitDice) {
 				const regain = Math.max(1, Math.floor(hd.total / 2));
@@ -126,7 +167,7 @@ export function planRest(state: AdventureState, opts: RestOptions): RestPlan {
 				c.current = c.max;
 			}
 		}
-		entries.push({ characterId: id, name: before.name, before, after, lines });
+		entries.push({ characterId: id, name: before.name, before, after, lines, errors });
 	}
 	const removeEffectIds = opts.removeEffectIds.filter((eid) => {
 		const e = state.effects[eid];

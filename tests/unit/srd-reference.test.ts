@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { getSrd, type SrdData } from '../../src/domain/srd';
-import { CLASSES, RACES, spellSlotsFor, ITEM_TYPES, RU_NAMES, CREATURE_TEMPLATES } from '../../src/domain/srd-data';
+import { CLASSES, RACES, RACE_TRAITS, spellSlotsFor, ITEM_TYPES, RU_NAMES, CREATURE_TEMPLATES } from '../../src/domain/srd-data';
 
 const srd = JSON.parse(readFileSync('data/srd51/srd51.json', 'utf8')) as SrdData;
 const by = <T extends { id: string }>(list: T[], id: string): T => {
@@ -272,3 +272,72 @@ describe('derived item tables', () => {
 		for (const t of CREATURE_TEMPLATES) expect(srd.monsters.some((m) => m.id === t.monsterId), t.id).toBe(true);
 	});
 });
+
+describe('class proficiencies and racial traits vs the SRD text', () => {
+	const cls = (id: string) => by(srd.classes, id);
+	const termOf = (id: string): string => {
+		const n = ITEM_TYPES[id]?.name.toLowerCase() ?? id;
+		return n.replace(/^crossbow, (\w+)$/, '$1 crossbow');
+	};
+	const stem = (w: string): string => w.replace(/s$/, '');
+	it('weapon proficiencies equal the SRD "Weapons:" line of every class', () => {
+		for (const c of CLASSES) {
+			const srdLine = (cls(c.id).weapons ?? '').toLowerCase();
+			const expectSimple = /simple weapons/.test(srdLine);
+			const expectMartial = /martial weapons/.test(srdLine);
+			expect(c.weaponProf.includes('simple'), `${c.id} simple`).toBe(expectSimple);
+			expect(c.weaponProf.includes('martial'), `${c.id} martial`).toBe(expectMartial);
+			const named = c.weaponProf.filter((x) => x !== 'simple' && x !== 'martial').map((x) => stem(termOf(x)));
+			const srdNamed = srdLine.replace(/simple weapons,?|martial weapons,?/g, '').split(',').map((x) => stem(x.trim().replace(/^and /, ''))).filter(Boolean);
+			expect(named.sort(), c.id).toEqual(srdNamed.sort());
+		}
+	});
+	it('armor proficiencies equal the SRD "Armor:" line', () => {
+		for (const c of CLASSES) {
+			const t = (cls(c.id).armor ?? '').toLowerCase();
+			expect(c.armorProf.includes('light'), `${c.id} light`).toBe(/light armor|all armor/.test(t));
+			expect(c.armorProf.includes('medium'), `${c.id} medium`).toBe(/medium armor|all armor/.test(t));
+			expect(c.armorProf.includes('heavy'), `${c.id} heavy`).toBe(/heavy armor|all armor/.test(t));
+			expect(c.armorProf.includes('shield'), `${c.id} shield`).toBe(/shield/.test(t));
+		}
+	});
+	it('casting class types: full (bard, cleric, druid, sorcerer, wizard), half (paladin, ranger), pact (warlock)', () => {
+		const m = (id: string) => CLASSES.find((c) => c.id === id)?.caster;
+		expect(['bard', 'cleric', 'druid', 'sorcerer', 'wizard'].map(m)).toEqual(Array(5).fill('full'));
+		expect(['paladin', 'ranger'].map(m)).toEqual(['half', 'half']);
+		expect(['barbarian', 'fighter', 'monk', 'rogue', 'warlock'].map(m)).toEqual(Array(5).fill('none'));
+		expect(cls('wizard').text).toMatch(/Intelligence is your spellcasting ability/);
+		expect(cls('paladin').text).toMatch(/Charisma is your spellcasting ability/);
+		expect(cls('ranger').text).toMatch(/Wisdom is your spellcasting ability/);
+		expect(cls('warlock').text).toMatch(/Charisma is your spellcasting ability/);
+	});
+	it('subclass levels: sorcerer/cleric/warlock 1, druid/wizard 2, others 3', () => {
+		const lvl = (id: string) => CLASSES.find((c) => c.id === id)?.subclassLevel;
+		expect(['cleric', 'sorcerer', 'warlock'].map(lvl)).toEqual([1, 1, 1]);
+		expect(['druid', 'wizard'].map(lvl)).toEqual([2, 2]);
+		expect(['barbarian', 'bard', 'fighter', 'monk', 'paladin', 'ranger', 'rogue'].map(lvl)).toEqual(Array(7).fill(3));
+		const first: Record<string, [number, string]> = { cleric: [1, 'Divine Domain'], warlock: [1, 'Otherworldly Patron'], druid: [2, 'Druid Circle'], wizard: [2, 'Arcane Tradition'], barbarian: [3, 'Primal Path'], bard: [3, 'Bard College'], fighter: [3, 'Martial Archetype'], monk: [3, 'Monastic Tradition'], paladin: [3, 'Sacred Oath'], rogue: [3, 'Roguish Archetype'] };
+		expect(cls('sorcerer').text).toMatch(/Sorcerous Origin Choose a sorcerous origin[\s\S]{0,160}when you choose it at 1st level/); // table row wraps in the PDF
+		for (const [id, [l, name]] of Object.entries(first)) {
+			const row = cls(id).levels[l - 1];
+			const cells = (r?: { features: string[]; cols: string[] }): string => [...(r?.features ?? []), ...(r?.cols ?? [])].join(' ');
+			expect(cells(row), `${id} L${l} ${name}`).toContain(name);
+			expect(CLASSES.find((c) => c.id === id)?.subclassLevel, id).toBe(l);
+			if (l > 1) expect(cells(cls(id).levels[l - 2]), `${id} before L${l}`).not.toContain(name);
+		}
+	});
+	it('SRD subclasses: exactly one per class, found as headings in the PDF', () => {
+		expect(srd.subclasses.map((s) => s.name).sort()).toEqual(['Champion', 'Circle of the Land', 'College of Lore', 'Draconic Bloodline', 'Hunter', 'Life Domain', 'Oath of Devotion', 'Path of the Berserker', 'School of Evocation', 'The Fiend', 'Thief', 'Way of the Open Hand']);
+	});
+	it('racial traits backed by SRD text', () => {
+		const race = (id: string) => by(srd.races, id).text ?? '';
+		expect(race('elf')).toMatch(/proficiency in the Perception skill/);
+		expect(race('high-elf')).toMatch(/longsword, shortsword, shortbow, and longbow/);
+		expect(race('high-elf')).toMatch(/one cantrip of your choice from the wizard spell list/);
+		expect(race('hill-dwarf')).toMatch(/hit point maximum increases by 1, and it increases by 1 every time you gain a level/);
+		expect(race('dwarf')).toMatch(/battleaxe, handaxe, light hammer, and warhammer/);
+		expect(race('half-orc')).toMatch(/proficiency in the Intimidation skill/);
+		expect(race('half-elf')).toMatch(/proficiency in two skills of your choice/);
+	});
+});
+void RACE_TRAITS;

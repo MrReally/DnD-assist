@@ -1,6 +1,8 @@
 // Character builder (by rules, 2014 SRD data) and quick NPC creation. Pure; ids and randomness are injected.
-import { ABILITIES, abilityMod, cockpitOf, emptySheet, isFinesse, profByLevel, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
-import { CLASSES, CREATURE_TEMPLATES, ITEM_ID_ALIASES, ITEM_TYPES, monsterOf, RACES, spellSlotsFor, statBlockFromMonster, type ClassDef, type CreatureTemplate } from './srd-data';
+import { ABILITIES, abilityMod, cockpitOf, emptySheet, isFinesse, profByLevel, type Abilities, type ItemInstance, type Purse, type Sheet, type SpellRef, type Spellbook, type StatBlock } from './cockpit';
+import { asiLevels, cantripsKnown, countersFor, pactMagic, preparedSpellCount, wizardSpellbookSize } from './class-rules';
+import { getSrd } from './srd';
+import { CLASSES, raceTraits, CREATURE_TEMPLATES, ITEM_ID_ALIASES, ITEM_TYPES, monsterOf, RACES, spellSlotsFor, statBlockFromMonster, type ClassDef, type CreatureTemplate } from './srd-data';
 import type { SrdMonster } from './srd';
 import { emptyCharacter } from './state';
 import type { AbilityId, AdventureState, CharacterState, CreatureCard } from './types';
@@ -22,6 +24,18 @@ export interface BuildChoices {
 	background: string;
 	subclass: string;
 	skills: string[];
+	/** 'acolyte' = SRD background (Insight, Religion); 'custom' = anything else, skills entered by the GM (nothing assumed). */
+	backgroundKind?: 'srd' | 'custom';
+	/** Skills of a custom background (exactly what the paper sheet says). */
+	backgroundSkills?: string[];
+	/** Skills chosen for racial options (e.g. half-elf Skill Versatility). */
+	raceSkills?: string[];
+	/** Spell ids: cantrips known (class + racial choice), spellbook / known spells, prepared. */
+	/** One entry per Ability Score Improvement the class has gained: [a] = +2 to a, [a, b] = +1 each, 'grappler' = the SRD feat. */
+	asi?: Array<AbilityId[] | 'grappler'>;
+	cantrips?: string[];
+	spells?: string[];
+	prepared?: string[];
 	/** Item type ids to equip/carry. */
 	gear: string[];
 	notePath: string;
@@ -75,6 +89,7 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 	if (!cls) throw new Error('Неизвестный класс');
 	if (!race) throw new Error('Неизвестная раса');
 	const level = Math.max(1, Math.min(20, Math.floor(ch.level)));
+	const traits = raceTraits(ch.raceId, ch.subraceId);
 	const abilities: Abilities = { ...ch.baseAbilities };
 	for (const [k, v] of Object.entries(race.bonus)) abilities[k as AbilityId] += v ?? 0;
 	for (const [k, v] of Object.entries(sub?.bonus ?? {})) abilities[k as AbilityId] += v ?? 0;
@@ -84,9 +99,26 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 		for (const p of picks) abilities[p] += race.freeBonus.amount;
 	}
 	for (const k of ABILITIES) if (abilities[k] > 20) abilities[k] = 20;
+	const features: Array<{ name: string; text: string }> = [];
+	const asiSlots = asiLevels(cls.id, level);
+	const picks = ch.asi ?? [];
+	if (picks.length < asiSlots.length) warnings.push(`Не выбрано повышений характеристик: ${asiSlots.length - picks.length} (уровни ${asiSlots.slice(picks.length).join(', ')}) — значения не подставлены`);
+	if (picks.length > asiSlots.length) warnings.push('Выбрано больше повышений характеристик, чем даёт уровень — лишние проигнорированы');
+	for (const p of picks.slice(0, asiSlots.length)) {
+		if (p === 'grappler') {
+			if (abilities.str < 13) warnings.push('Черта Grappler требует Силу 13 — проверьте');
+			features.push({ name: 'Grappler', text: 'Черта SRD 5.1 (см. справочник).' });
+			continue;
+		}
+		const inc = p.length === 1 ? 2 : 1;
+		for (const a of p.slice(0, 2)) {
+			if (abilities[a] + inc > 20) warnings.push(`${a.toUpperCase()}: повышение выше 20 невозможно — ограничено`);
+			abilities[a] = Math.min(20, abilities[a] + inc);
+		}
+	}
 	const conMod = abilityMod(abilities.con);
 	const avg = Math.floor(cls.hitDie / 2) + 1;
-	const hp = ch.hpOverride ?? Math.max(1, cls.hitDie + conMod + (level - 1) * Math.max(1, avg + conMod));
+	const hp = ch.hpOverride ?? Math.max(1, cls.hitDie + conMod + (level - 1) * Math.max(1, avg + conMod)) + (traits.hpPerLevel ?? 0) * level;
 
 	const character = emptyCharacter(newId('pc'), ch.name.trim() || 'Новый персонаж', ch.notePath);
 	character.classes = [{ name: cls.ru, level }];
@@ -96,28 +128,47 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 	character.hitDice = [{ die: `d${cls.hitDie}` as 'd6', total: level, remaining: level }];
 	const slots = spellSlotsFor(cls.caster, level);
 	for (const [lv, n] of Object.entries(slots)) character.spellSlots[lv] = { max: n, current: n };
+	if (cls.id === 'warlock') {
+		const pm = pactMagic(level);
+		if (pm) character.spellSlots[String(pm.slotLevel)] = { max: pm.slots, current: pm.slots };
+		character.extensions = { ...(character.extensions ?? {}), pactMagic: true };
+	}
+	character.counters = countersFor(character, (name) => CLASSES.find((c) => c.ru === name)?.id, abilities);
 
 	const skills: Record<string, 1 | 2> = {};
 	const allowed = cls.skillList === 'any' ? null : new Set(cls.skillList);
-	for (const s of ch.skills.slice(0, cls.skillChoices)) {
-		if (allowed && !allowed.has(s)) {
-			warnings.push(`Навык «${s}» не входит в список класса — отмечен вручную`);
-		}
-		skills[s] = 1;
+	const grant = (id: string, from: string): void => {
+		if (skills[id]) warnings.push(`Навык «${id}» уже есть (${from}) — по правилам выберите другой навык взамен`);
+		skills[id] = 1;
+	};
+	for (const sk of traits.skills ?? []) grant(sk, 'раса');
+	const bgKind = ch.backgroundKind ?? 'custom';
+	if (bgKind === 'srd') for (const sk of ['insight', 'religion']) grant(sk, 'предыстория Acolyte');
+	else for (const sk of ch.backgroundSkills ?? []) grant(sk, 'предыстория (введено вручную)');
+	if ((traits.freeSkills ?? 0) > (ch.raceSkills?.length ?? 0)) warnings.push(`Не выбрано навыков расы: ${(traits.freeSkills ?? 0) - (ch.raceSkills?.length ?? 0)}`);
+	for (const sk of (ch.raceSkills ?? []).slice(0, traits.freeSkills ?? 0)) grant(sk, 'раса');
+	for (const sk of ch.skills.slice(0, cls.skillChoices)) {
+		if (allowed && !allowed.has(sk)) warnings.push(`Навык «${sk}» не входит в список класса — отмечен вручную`);
+		grant(sk, 'класс');
 	}
-	if (ch.skills.length < cls.skillChoices) warnings.push(`Выбрано навыков: ${ch.skills.length} из ${cls.skillChoices}`);
+	if (ch.skills.length < cls.skillChoices) warnings.push(`Выбрано навыков класса: ${ch.skills.length} из ${cls.skillChoices}`);
 
 	const sheet: Sheet = {
 		...emptySheet(),
+		raceId: race.id,
+		...(sub ? { subraceId: sub.id } : {}),
+		classId: cls.id,
+		backgroundKind: bgKind,
 		race: sub ? sub.ru : race.ru,
 		background: ch.background,
 		subclass: ch.subclass,
 		abilities,
 		saveProf: [...cls.saves],
 		skills,
-		weaponProf: [...cls.weaponProf],
+		weaponProf: [...new Set([...cls.weaponProf, ...(traits.weaponProf ?? [])])],
 		armorProf: [...cls.armorProf],
 		castAbility: cls.castAbility,
+		features,
 	};
 	if (level >= cls.subclassLevel && !ch.subclass.trim()) warnings.push(`Подкласс выбирается на ${cls.subclassLevel} уровне — укажите вручную`);
 
@@ -130,7 +181,36 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 	}
 	character.ac = armorClassFor(abilities, items.filter((i) => i.equipped).map((i) => types[i.typeId ?? '']).filter((t): t is ItemType => !!t));
 	warnings.push('Проверьте результат по бумажному листу: он остаётся источником истины.');
-	return { character, sheet, items, ...(cls.caster !== 'none' ? { book: { known: [], prepared: [] } } : {}), warnings };
+	const spellcaster = cls.caster !== 'none' || cls.id === 'warlock';
+	let book: Spellbook | undefined;
+	if (spellcaster) {
+		const ref = (id: string): SpellRef | null => {
+			const sp = getSrd()?.spells.find((x) => x.id === id);
+			return sp ? { id: sp.id, name: sp.name, level: sp.level, concentration: sp.concentration } : null;
+		};
+		const ids = [...new Set([...(ch.cantrips ?? []), ...(ch.spells ?? [])])];
+		const known = ids.map(ref).filter((r): r is SpellRef => !!r);
+		const want = preparedSpellCount(cls.id, level, abilities);
+		const prepared = [...new Set(ch.prepared ?? [])].filter((id) => known.some((k) => k.id === id && k.level > 0));
+		if (want !== null && prepared.length > want) warnings.push(`Подготовлено заклинаний ${prepared.length}, допустимо ${want}`);
+		if (want !== null && prepared.length < want) warnings.push(`Подготовлено ${prepared.length} из ${want} заклинаний — выберите остальные`);
+		if (cls.id === 'wizard') {
+			const exp = wizardSpellbookSize(level);
+			if (known.filter((k) => k.level > 0).length < exp) warnings.push(`В книге заклинаний ${known.filter((k) => k.level > 0).length} из ${exp} по правилам — добавьте остальные`);
+		}
+		const wantCantrips = cantripsKnown(cls.id, level);
+		const haveCantrips = known.filter((k) => k.level === 0).length;
+		const extra = traits.wizardCantrips ?? 0;
+		if (wantCantrips !== null && haveCantrips < wantCantrips + (cls.id === 'wizard' ? extra : 0)) warnings.push(`Заговоров ${haveCantrips} из ${wantCantrips}${cls.id === 'wizard' && extra ? ` + ${extra} расовый (Wizard cantrip)` : ''} — выберите остальные`);
+		const maxSlot = Math.max(0, ...Object.keys(character.spellSlots).map(Number));
+		for (const k of known) {
+			const sp = getSrd()?.spells.find((x) => x.id === k.id);
+			if (sp && !sp.classes.includes(cls.id) && !(k.level === 0 && extra && cls.id !== 'wizard')) warnings.push(`«${sp.name}» нет в списке заклинаний класса ${cls.ru} (SRD)`);
+			if (k.level > maxSlot && k.level > 0) warnings.push(`«${k.name}» выше доступных ячеек (${k.level} ур.)`);
+		}
+		book = { known, prepared };
+	}
+	return { character, sheet, items, ...(book ? { book } : {}), warnings };
 }
 
 // ---- quick NPC ----------------------------------------------------------------------------------
@@ -251,7 +331,7 @@ export function levelUp(ch: CharacterState, sheet: Sheet): LevelUpResult {
 	const next = structuredClone(ch);
 	const lv = entry.level + 1;
 	(next.classes[idx] as { level: number }).level = lv;
-	const gain = Math.max(1, Math.floor(def.hitDie / 2) + 1 + abilityMod(sheet.abilities.con));
+	const gain = Math.max(1, Math.floor(def.hitDie / 2) + 1 + abilityMod(sheet.abilities.con)) + raceTraits(sheet.raceId ?? '', sheet.subraceId).hpPerLevel!;
 	if (next.hp.max !== null) {
 		next.hp = { ...next.hp, max: next.hp.max + gain, current: next.hp.current + gain };
 	} else warnings.push('Максимум HP не задан — не изменён');
@@ -262,11 +342,17 @@ export function levelUp(ch: CharacterState, sheet: Sheet): LevelUpResult {
 		hd.remaining += 1;
 	} else next.hitDice.push({ die, total: 1, remaining: 1 });
 	const slots = spellSlotsFor(def.caster, lv);
+	if (def.id === 'warlock') {
+		const pm = pactMagic(lv);
+		for (const k of Object.keys(next.spellSlots)) delete next.spellSlots[k];
+		if (pm) next.spellSlots[String(pm.slotLevel)] = { max: pm.slots, current: pm.slots };
+	}
 	for (const [k, n] of Object.entries(slots)) {
 		const cur = next.spellSlots[k];
 		const spent = cur ? cur.max - cur.current : 0;
 		next.spellSlots[k] = { max: n, current: Math.max(0, n - spent) };
 	}
+	next.counters = countersFor(next, (name) => CLASSES.find((c) => c.ru === name)?.id, sheet.abilities);
 	if (lv === def.subclassLevel && !sheet.subclass.trim()) warnings.push('Выберите подкласс');
 	if ([4, 8, 12, 16, 19].includes(lv)) warnings.push('Повышение характеристик или черта — внесите вручную');
 	warnings.push(`Мастерство теперь +${profByLevel(totalLevelOf(next))}. Сверьте с бумажным листом.`);

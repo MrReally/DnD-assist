@@ -300,7 +300,7 @@ export class BuilderModal extends Modal {
 		}
 		el.createDiv({ cls: 'gmc-eyebrow', text: 'Снаряжение' });
 		const gear = el.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap' });
-		for (const id of ['longsword', 'dagger', 'shortbow', 'quarterstaff', 'leather', 'chain-mail', 'shield', 'backpack', 'rope']) {
+		for (const id of ['longsword', 'dagger', 'shortbow', 'quarterstaff', 'leather', 'chain-mail', 'shield', 'backpack', 'rope-hempen-50-feet']) {
 			const t = ITEM_TYPES[id];
 			if (!t) continue;
 			const lab = gear.createEl('label', { cls: 'gmc-check' });

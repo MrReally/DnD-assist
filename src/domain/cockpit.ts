@@ -37,6 +37,12 @@ export interface Feature {
 
 /** Hand-editable character sheet data the base CharacterState does not carry. Paper sheet is the source of truth. */
 export interface Sheet {
+	/** SRD ids (optional: hand-entered sheets have none). */
+	raceId?: string;
+	subraceId?: string;
+	classId?: string;
+	/** 'srd' = SRD background, 'custom' = entered by the GM (not in the SRD, nothing is pre-filled). */
+	backgroundKind?: 'srd' | 'custom';
 	race: string;
 	background: string;
 	subclass: string;

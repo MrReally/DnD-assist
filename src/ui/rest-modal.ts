@@ -1,5 +1,6 @@
 // Short/long rest for selected PCs of a party: checkboxes, options, preview «до → после», one undoable action.
 import { Modal, Setting } from 'obsidian';
+import { arcaneRecoveryBudget } from '../domain/class-rules';
 import { defaultRestOptions, planRest, type RestKind, type RestOptions } from '../domain/rest';
 import type { Controller } from '../controller';
 import { button } from './common';
@@ -101,7 +102,7 @@ export class RestModal extends Modal {
 			if (!ch) continue;
 			const counters = Object.values(ch.counters);
 			const effects = Object.values(s.effects).filter((e) => e.target.kind === 'character' && e.target.id === id);
-			if (!counters.length && !effects.length && !(this.kind === 'short' && ch.hitDice.length)) continue;
+			if (!counters.length && !effects.length && !(this.kind === 'short' && ch.hitDice.length) && ch.extensions?.pactMagic !== true) continue;
 			const box = o.createDiv({ cls: 'ca-rest-char' });
 			box.createEl('h5', { text: ch.name });
 			for (const c of counters) {
@@ -138,6 +139,40 @@ export class RestModal extends Modal {
 						});
 				}
 			}
+			const wiz = ch.classes.find((k) => k.name === 'Волшебник');
+			const arcane = ch.counters['arcane-recovery'];
+			if (this.kind === 'short' && wiz && arcane) {
+				const chosen = this.opts.arcaneRecovery?.[id] ?? [];
+				const row = box.createDiv({ cls: 'ca-arcane', attr: { 'data-testid': 'rest-arcane' } });
+				row.createDiv({ text: `Магическое восстановление (раз в день, ${arcane.current > 0 ? 'доступно' : 'уже использовано'}): ячейки суммарным уровнем не больше ${arcaneRecoveryBudget(wiz.level)}, не выше 5-го. Выбирает игрок.` });
+				if (arcane.current > 0) {
+					for (const [lvl, slot] of Object.entries(ch.spellSlots)) {
+						if (Number(lvl) > 5) continue;
+						const missing = slot.max - slot.current;
+						for (let n = 1; n <= missing; n++) {
+							const key = Number(lvl);
+							const count = chosen.filter((x) => x === key).length;
+							new Setting(row).setName(`Ячейка ${lvl} ур. (${n}-я из израсходованных)`).addToggle((t) =>
+								t.setValue(count >= n).onChange((v) => {
+									const rest = chosen.filter((x) => x !== key);
+									const target = v ? n : n - 1;
+									const next = [...rest, ...Array<number>(target).fill(key)];
+									this.opts.arcaneRecovery = { ...(this.opts.arcaneRecovery ?? {}), [id]: next };
+									this.render();
+								}),
+							);
+						}
+					}
+				}
+			}
+			if (this.kind === 'short' && ch.extensions?.pactMagic === true) {
+				new Setting(box).setName('Магия договора: восстановить ячейки').setDesc('Правило колдуна: все ячейки возвращаются после короткого отдыха').addToggle((t) =>
+					t.setValue(this.opts.pactMagic !== false).onChange((v) => {
+						this.opts.pactMagic = v;
+						this.render();
+					}),
+				);
+			}
 			for (const e of effects) {
 				new Setting(box).setName(`Снять эффект «${e.label}»`).addToggle((t) =>
 					t.setValue(this.opts.removeEffectIds.includes(e.id)).onChange((v) => {
@@ -162,6 +197,8 @@ export class RestModal extends Modal {
 		if (plan.removeEffectIds.length) prev.createEl('p', { text: `Снимаемых эффектов: ${plan.removeEffectIds.length}` });
 		if (!any && !plan.removeEffectIds.length) prev.createEl('p', { cls: 'ca-muted', text: 'Нет изменений' });
 
+		const blocking = plan.entries.flatMap((e) => e.errors.map((m) => `${e.name}: ${m}`));
+		for (const m of blocking) prev.createEl('p', { cls: 'ca-warn', text: m, attr: { 'data-testid': 'rest-error' } });
 		const row = el.createDiv({ cls: 'ca-modal-buttons' });
 		button(row, 'Отмена', () => this.close());
 		button(
@@ -177,7 +214,7 @@ export class RestModal extends Modal {
 					});
 					if (out.ok) this.close();
 				})(),
-			{ cls: 'mod-cta', disabled: plan.entries.length === 0, testId: 'rest-apply' },
+			{ cls: 'mod-cta', disabled: plan.entries.length === 0 || blocking.length > 0, testId: 'rest-apply' },
 		);
 	}
 

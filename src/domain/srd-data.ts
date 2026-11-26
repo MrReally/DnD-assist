@@ -2,12 +2,12 @@
 // Nothing numeric about items or creatures is typed in here: it comes from data/srd51/srd51.json, which is
 // generated from the official PDF and cross-checked by tests/unit/srd-reference.test.ts.
 import type { Abilities, ItemType, StatBlock } from './cockpit';
-import { monsterById, onSrd, type SrdData, type SrdMonster } from './srd';
+import { getSrd, monsterById, onSrd, type SrdData, type SrdMonster } from './srd';
 import type { AbilityId } from './types';
 
 /** Old (v1.1.0) item type ids → SRD ids, so saved items keep resolving. */
 export const ITEM_ID_ALIASES: Readonly<Record<string, string>> = {
-	'light-crossbow': 'crossbow-light', 'hand-crossbow': 'crossbow-hand', 'heavy-crossbow': 'crossbow-heavy',
+	'crossbow-light': 'crossbow-light', 'crossbow-hand': 'crossbow-hand', 'heavy-crossbow': 'crossbow-heavy',
 	rope: 'rope-hempen-50-feet', arrows: 'arrows-20', bolts: 'crossbow-bolts-20', lantern: 'lantern-bullseye',
 	rations: 'rations-1-day', 'healing-potion': 'potion-of-healing', 'thieves-tools': 'thieves-tools',
 };
@@ -122,17 +122,17 @@ export interface ClassDef {
 
 export const CLASSES: readonly ClassDef[] = [
 	{ id: 'barbarian', ru: 'Варвар', hitDie: 12, saves: ['str', 'con'], skillChoices: 2, skillList: ['animal', 'athletics', 'intimidation', 'nature', 'perception', 'survival'], weaponProf: ['simple', 'martial'], armorProf: ['light', 'medium', 'shield'], caster: 'none', castAbility: null, subclassLevel: 3 },
-	{ id: 'bard', ru: 'Бард', hitDie: 8, saves: ['dex', 'cha'], skillChoices: 3, skillList: 'any', weaponProf: ['simple', 'hand-crossbow', 'longsword', 'rapier', 'shortsword'], armorProf: ['light'], caster: 'full', castAbility: 'cha', subclassLevel: 3 },
+	{ id: 'bard', ru: 'Бард', hitDie: 8, saves: ['dex', 'cha'], skillChoices: 3, skillList: 'any', weaponProf: ['simple', 'crossbow-hand', 'longsword', 'rapier', 'shortsword'], armorProf: ['light'], caster: 'full', castAbility: 'cha', subclassLevel: 3 },
 	{ id: 'cleric', ru: 'Жрец', hitDie: 8, saves: ['wis', 'cha'], skillChoices: 2, skillList: ['history', 'insight', 'medicine', 'persuasion', 'religion'], weaponProf: ['simple'], armorProf: ['light', 'medium', 'shield'], caster: 'full', castAbility: 'wis', subclassLevel: 1 },
 	{ id: 'druid', ru: 'Друид', hitDie: 8, saves: ['int', 'wis'], skillChoices: 2, skillList: ['arcana', 'animal', 'insight', 'medicine', 'nature', 'perception', 'religion', 'survival'], weaponProf: ['club', 'dagger', 'dart', 'javelin', 'mace', 'quarterstaff', 'scimitar', 'sickle', 'sling', 'spear'], armorProf: ['light', 'medium', 'shield'], caster: 'full', castAbility: 'wis', subclassLevel: 2 },
 	{ id: 'fighter', ru: 'Воин', hitDie: 10, saves: ['str', 'con'], skillChoices: 2, skillList: ['acrobatics', 'animal', 'athletics', 'history', 'insight', 'intimidation', 'perception', 'survival'], weaponProf: ['simple', 'martial'], armorProf: ['light', 'medium', 'heavy', 'shield'], caster: 'none', castAbility: null, subclassLevel: 3 },
 	{ id: 'monk', ru: 'Монах', hitDie: 8, saves: ['str', 'dex'], skillChoices: 2, skillList: ['acrobatics', 'athletics', 'history', 'insight', 'religion', 'stealth'], weaponProf: ['simple', 'shortsword'], armorProf: [], caster: 'none', castAbility: null, subclassLevel: 3 },
 	{ id: 'paladin', ru: 'Паладин', hitDie: 10, saves: ['wis', 'cha'], skillChoices: 2, skillList: ['athletics', 'insight', 'intimidation', 'medicine', 'persuasion', 'religion'], weaponProf: ['simple', 'martial'], armorProf: ['light', 'medium', 'heavy', 'shield'], caster: 'half', castAbility: 'cha', subclassLevel: 3 },
 	{ id: 'ranger', ru: 'Следопыт', hitDie: 10, saves: ['str', 'dex'], skillChoices: 3, skillList: ['animal', 'athletics', 'insight', 'investigation', 'nature', 'perception', 'stealth', 'survival'], weaponProf: ['simple', 'martial'], armorProf: ['light', 'medium', 'shield'], caster: 'half', castAbility: 'wis', subclassLevel: 3 },
-	{ id: 'rogue', ru: 'Плут', hitDie: 8, saves: ['dex', 'int'], skillChoices: 4, skillList: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleight', 'stealth'], weaponProf: ['simple', 'hand-crossbow', 'longsword', 'rapier', 'shortsword'], armorProf: ['light'], caster: 'none', castAbility: null, subclassLevel: 3 },
-	{ id: 'sorcerer', ru: 'Чародей', hitDie: 6, saves: ['con', 'cha'], skillChoices: 2, skillList: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'], weaponProf: ['dagger', 'dart', 'sling', 'quarterstaff', 'light-crossbow'], armorProf: [], caster: 'full', castAbility: 'cha', subclassLevel: 1 },
+	{ id: 'rogue', ru: 'Плут', hitDie: 8, saves: ['dex', 'int'], skillChoices: 4, skillList: ['acrobatics', 'athletics', 'deception', 'insight', 'intimidation', 'investigation', 'perception', 'performance', 'persuasion', 'sleight', 'stealth'], weaponProf: ['simple', 'crossbow-hand', 'longsword', 'rapier', 'shortsword'], armorProf: ['light'], caster: 'none', castAbility: null, subclassLevel: 3 },
+	{ id: 'sorcerer', ru: 'Чародей', hitDie: 6, saves: ['con', 'cha'], skillChoices: 2, skillList: ['arcana', 'deception', 'insight', 'intimidation', 'persuasion', 'religion'], weaponProf: ['dagger', 'dart', 'sling', 'quarterstaff', 'crossbow-light'], armorProf: [], caster: 'full', castAbility: 'cha', subclassLevel: 1 },
 	{ id: 'warlock', ru: 'Колдун', hitDie: 8, saves: ['wis', 'cha'], skillChoices: 2, skillList: ['arcana', 'deception', 'history', 'intimidation', 'investigation', 'nature', 'religion'], weaponProf: ['simple'], armorProf: ['light'], caster: 'none', castAbility: 'cha', subclassLevel: 1 },
-	{ id: 'wizard', ru: 'Волшебник', hitDie: 6, saves: ['int', 'wis'], skillChoices: 2, skillList: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'], weaponProf: ['dagger', 'dart', 'sling', 'quarterstaff', 'light-crossbow'], armorProf: [], caster: 'full', castAbility: 'int', subclassLevel: 2 },
+	{ id: 'wizard', ru: 'Волшебник', hitDie: 6, saves: ['int', 'wis'], skillChoices: 2, skillList: ['arcana', 'history', 'insight', 'investigation', 'medicine', 'religion'], weaponProf: ['dagger', 'dart', 'sling', 'quarterstaff', 'crossbow-light'], armorProf: [], caster: 'full', castAbility: 'int', subclassLevel: 2 },
 ];
 
 export interface RaceDef {
@@ -178,4 +178,50 @@ export function spellSlotsFor(caster: ClassDef['caster'], level: number): Record
 	const out: Record<string, number> = {};
 	row?.forEach((n, i) => (out[String(i + 1)] = n));
 	return out;
+}
+
+/**
+ * Racial traits that change mechanics. Each entry is backed by a regex over the SRD race text in
+ * tests/unit/srd-reference.test.ts, so none of it rests on memory. Anything else about a race stays free text.
+ */
+export interface RaceTraits {
+	/** Skill proficiencies granted outright. */
+	skills?: string[];
+	/** Weapon proficiencies granted (SRD weapon ids). */
+	weaponProf?: string[];
+	/** Extra hit points per level (Dwarven Toughness). */
+	hpPerLevel?: number;
+	/** Number of skills the player chooses (Skill Versatility). */
+	freeSkills?: number;
+	/** Wizard cantrips the player chooses (High Elf). */
+	wizardCantrips?: number;
+	/** Extra languages the player chooses. */
+	languages?: number;
+}
+
+export const RACE_TRAITS: Readonly<Record<string, RaceTraits>> = {
+	dwarf: { weaponProf: ['battleaxe', 'handaxe', 'light-hammer', 'warhammer'] },
+	'hill-dwarf': { hpPerLevel: 1 },
+	elf: { skills: ['perception'] },
+	'high-elf': { weaponProf: ['longsword', 'shortsword', 'shortbow', 'longbow'], wizardCantrips: 1, languages: 1 },
+	'half-elf': { freeSkills: 2, languages: 1 },
+	'half-orc': { skills: ['intimidation'] },
+};
+
+/** Racial traits of a race plus its subrace. */
+export function raceTraits(raceId: string, subraceId?: string): RaceTraits {
+	const a = RACE_TRAITS[raceId] ?? {};
+	const b = (subraceId && RACE_TRAITS[subraceId]) || {};
+	return { skills: [...(a.skills ?? []), ...(b.skills ?? [])], weaponProf: [...(a.weaponProf ?? []), ...(b.weaponProf ?? [])], hpPerLevel: (a.hpPerLevel ?? 0) + (b.hpPerLevel ?? 0), freeSkills: (a.freeSkills ?? 0) + (b.freeSkills ?? 0), wizardCantrips: (a.wizardCantrips ?? 0) + (b.wizardCantrips ?? 0), languages: (a.languages ?? 0) + (b.languages ?? 0) };
+}
+
+export interface SubclassDef {
+	id: string;
+	name: string;
+	classId: string;
+}
+
+/** SRD subclasses (one per class); names come from the SRD data file. */
+export function srdSubclasses(classId: string): SubclassDef[] {
+	return (getSrd()?.subclasses ?? []).filter((x) => x.classId === classId).map((x) => ({ id: x.id, name: x.name, classId }));
 }

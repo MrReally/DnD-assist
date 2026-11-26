@@ -219,7 +219,13 @@ for (const cn of CLASS_LIST) {
 	const rows = [];
 	const t0 = tableLines.findIndex((l, i) => new RegExp(`^The ${cn}`).test(l) || (l === cn && /^Level/.test(tableLines[i + 1] ?? '')));
 	void hdAt; void t0;
-	classes.push({ id: slug(cn), name: cn, type: 'class', hitDie, savingThrows: take('Saving Throws:'), armor: take('Armor:'), weapons: take('Weapons:'), tools: take('Tools:'), skills: take('Skills:'), levels: rows, ...SRC });
+	classes.push({ id: slug(cn), name: cn, type: 'class', secStart, hitDie, savingThrows: take('Saving Throws:'), armor: take('Armor:'), weapons: take('Weapons:'), tools: take('Tools:'), skills: take('Skills:'), levels: rows, ...SRC });
+}
+classes.sort((a, b) => a.secStart - b.secStart);
+for (const [i, c] of classes.entries()) {
+	const end = classes[i + 1]?.secStart ?? c.secStart + 3500;
+	c.text = clean(prose.slice(c.secStart, Math.min(end, c.secStart + 4000)).join(" ")).slice(0, 20000);
+	delete c.secStart;
 }
 // level tables: rows "1st +2 Feature, Feature 3 2 —" after the "The <Class>" heading. Wide tables are read from the
 // full-width page lines, narrow ones from the column-cropped prose. A table is accepted only if it is clean:
@@ -252,6 +258,14 @@ for (const c of classes) {
 	else { c.levels = []; c.verification = 'partial'; warnings.push(`class level table not cleanly extracted: ${c.name}`); }
 }
 
+// ---- subclasses (the SRD has exactly one per class; names are looked up as headings, never assumed) -------------
+const SUBCLASS_NAMES = { barbarian: 'Path of the Berserker', bard: 'College of Lore', cleric: 'Life Domain', druid: 'Circle of the Land', fighter: 'Champion', monk: 'Way of the Open Hand', paladin: 'Oath of Devotion', ranger: 'Hunter', rogue: 'Thief', sorcerer: 'Draconic Bloodline', warlock: 'The Fiend', wizard: 'School of Evocation' };
+const subclasses = [];
+for (const [cid, name] of Object.entries(SUBCLASS_NAMES)) {
+	if (prose.some((l) => l === name || l.startsWith(`${name} `))) subclasses.push({ id: slug(name), name, type: 'subclass', classId: cid, ...SRC });
+	else warnings.push(`subclass heading not found: ${name}`);
+}
+
 // ---- races, backgrounds, feats ----------------------------------------------------------------
 const RACE_HEADS = ['Dwarf', 'Hill Dwarf', 'Elf', 'High Elf', 'Halfling', 'Lightfoot', 'Human', 'Dragonborn', 'Gnome', 'Rock Gnome', 'Half-Elf', 'Half-Orc', 'Tiefling'];
 const races = [];
@@ -272,7 +286,7 @@ const races = [];
 		const asi = [];
 		for (const x of sentences) { if (/score|increase/i.test(x) && asi.length < 2 && !/^(Age|Speed|Size)/.test(x)) asi.push(x); else break; }
 		const speed = /base walking speed is (\d+) feet/.exec(txt)?.[1] ?? null;
-		races.push({ id: slug(h), name: h, type: 'race', abilityText: asi.join(' ') || null, speed: speed ? Number(speed) : null, ...SRC });
+		races.push({ id: slug(h), name: h, type: 'race', abilityText: asi.join(' ') || null, speed: speed ? Number(speed) : null, text: txt.slice(0, 6000), ...SRC });
 	}
 }
 const backgrounds = [];
@@ -305,7 +319,7 @@ const out = {
 		counts: { spells: spells.length, monsters: monsters.length, weapons: weapons.length, armor: armor.length, gear: gear.length, classes: classes.length, races: races.length, backgrounds: backgrounds.length, feats: feats.length },
 		warnings,
 	},
-	spells, monsters, weapons, armor, gear, classes, races, backgrounds, feats,
+	spells, monsters, weapons, armor, gear, classes, subclasses, races, backgrounds, feats,
 };
 rmSync(tmp, { recursive: true, force: true });
 mkdirSync(OUT.replace(/\/[^/]*$/, ''), { recursive: true });

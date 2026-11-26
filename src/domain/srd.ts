@@ -105,11 +105,14 @@ export interface SrdClass extends SrdBase {
 	tools: string | null;
 	skills: string | null;
 	levels: SrdClassLevel[];
+	/** Raw class section text (used to verify rule formulas and as reference). */
+	text?: string;
 }
 
 export interface SrdRace extends SrdBase {
 	abilityText: string | null;
 	speed: number | null;
+	text?: string;
 }
 
 export interface SrdData {
@@ -121,6 +124,7 @@ export interface SrdData {
 	gear: SrdGear[];
 	classes: SrdClass[];
 	races: SrdRace[];
+	subclasses: Array<SrdBase & { classId: string }>;
 	backgrounds: Array<SrdBase & { skills: string | null; languages: string | null }>;
 	feats: Array<SrdBase & { prerequisite: string; text: string }>;
 }
