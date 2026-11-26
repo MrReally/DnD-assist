@@ -16,8 +16,9 @@
 | Smoke (6 шагов) | 6/6 PASS на 1.14.4 и 1.7.7; 6/6 с повреждённым `srd51.json` |
 | Обновление (upgrade.mjs) | 5/5 PASS: 1.0.0 → текущая и 1.1.0 → текущая |
 | Регрессия v1 (`npm run test:e2e`) | 55 PASS, 1 NOT_RUN (мобильное), 1 INFO |
-| macOS GUI (Obsidian на Mac) | **NOT_RUN** |
-| Mac CI (workflow «Mac package») | запущен на ветке; результат — см. Actions; это сборка/юнит-тесты, не GUI |
+| macOS-раннер GitHub (arm64): сборка, lint, 295+39+4 теста, проверка пакета, демо-хранилище | PASS (run 45840589414) |
+| macOS-раннер: GUI smoke в реальном Obsidian 1.7.7 из пакета (6 шагов + 6 с повреждённым SRD) | PASS (тот же run) |
+| Ваш MacBook | **NOT_RUN** (чек-лист в `docs/MAC-TESTING.md`) |
 | Windows, мобильные | NOT_RUN |
 | Lightkey настоящий | NOT_RUN |
 
