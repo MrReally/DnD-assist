@@ -1,7 +1,7 @@
 import { Notice, Plugin, requestUrl, type EventRef, type Menu, type WorkspaceLeaf } from 'obsidian';
 import { cardTargetForNote, creatureForNote } from './domain/card';
 import { relativeTo } from './domain/normalize';
-import { isSrdData, setSrd, SRD_FILE } from './domain/srd';
+import { getSrd, isSrdData, setSrd, SRD_FILE } from './domain/srd';
 import { isRoomNote } from './domain/room';
 import { CheckpointModal, goBackToPreviousArea, goToViewPoint, ViewPointsModal } from './ui/cockpit/canvas-modals';
 import { GoToModal } from './ui/cockpit/goto-modal';
@@ -98,7 +98,7 @@ export default class CanvasAssistPlugin extends Plugin {
 		this.registerEvent(this.app.workspace.on('layout-change', () => this.syncOverlays()));
 		this.registerDomEvent(document, 'keydown', (ev) => this.onKeydown(ev), { capture: true });
 		// Exposed for the automated E2E harness and power users (read-only helpers).
-		(window as unknown as { canvasAssist?: unknown }).canvasAssist = { ctl: this.ctl, version: this.manifest.version, testLightkey: () => this.testLightkey() };
+		(window as unknown as { canvasAssist?: unknown }).canvasAssist = { ctl: this.ctl, version: this.manifest.version, testLightkey: () => this.testLightkey(), srdCounts: () => getSrd()?.meta.counts ?? null };
 	}
 
 	override onunload(): void {

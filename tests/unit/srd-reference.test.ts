@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { getSrd, type SrdData } from '../../src/domain/srd';
-import { CLASSES, RACES, RACE_TRAITS, spellSlotsFor, ITEM_TYPES, RU_NAMES, CREATURE_TEMPLATES } from '../../src/domain/srd-data';
+import { CLASSES, RACES, RACE_TRAITS, spellSlotsFor, ITEM_TYPES, ITEM_ID_ALIASES, RU_NAMES, CREATURE_TEMPLATES } from '../../src/domain/srd-data';
 
 const srd = JSON.parse(readFileSync('data/srd51/srd51.json', 'utf8')) as SrdData;
 const by = <T extends { id: string }>(list: T[], id: string): T => {
@@ -254,6 +254,22 @@ describe('curated rule tables vs the SRD', () => {
 		expect(srd.backgrounds.map((b) => b.id)).toEqual(['acolyte']);
 		expect(srd.backgrounds[0]?.skills).toBe('Insight, Religion');
 		expect(srd.feats.map((f) => f.id)).toEqual(['grappler']);
+	});
+});
+
+describe('adventuring gear vs the SRD gear table (typed from the PDF)', () => {
+	const ref: Record<string, [number, number | null]> = { 'arrows-20': [100, 1], 'crossbow-bolts-20': [100, 1.5], 'sling-bullets-20': [4, 1.5], backpack: [200, 5], bedroll: [100, 7], chest: [500, 25], pouch: [50, 1], sack: [1, 0.5], torch: [1, 1], tinderbox: [50, 1], waterskin: [20, 5], 'potion-of-healing': [5000, 0.5], 'rations-1-day': [50, 2], 'rope-hempen-50-feet': [100, 10], 'rope-silk-50-feet': [1000, 5], 'lantern-bullseye': [1000, 2], 'component-pouch': [2500, 2], spellbook: [5000, 3], 'thieves-tools': [2500, 1], abacus: [200, 2] };
+	it.each(Object.entries(ref))('%s', (id, [cost, weight]) => {
+		const g = srd.gear.find((x) => x.id === id);
+		expect(g, id).toBeDefined();
+		expect([g?.costCp, g?.weight]).toEqual([cost, weight]);
+	});
+});
+
+describe('v1.1.0 compatibility', () => {
+	it('every item type id used by 1.1.0 still resolves (directly or through an alias) to an SRD item', () => {
+		const old = ['club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'light-hammer', 'mace', 'quarterstaff', 'sickle', 'spear', 'light-crossbow', 'dart', 'shortbow', 'sling', 'battleaxe', 'flail', 'glaive', 'greataxe', 'greatsword', 'halberd', 'lance', 'longsword', 'maul', 'morningstar', 'pike', 'rapier', 'scimitar', 'shortsword', 'trident', 'war-pick', 'warhammer', 'whip', 'blowgun', 'hand-crossbow', 'heavy-crossbow', 'longbow', 'padded', 'leather', 'studded-leather', 'hide', 'chain-shirt', 'scale-mail', 'breastplate', 'half-plate', 'ring-mail', 'chain-mail', 'splint', 'plate', 'shield', 'backpack', 'sack', 'pouch', 'chest', 'rope', 'torch', 'rations', 'waterskin', 'bedroll', 'tinderbox', 'thieves-tools', 'lantern', 'arrows', 'bolts', 'healing-potion'];
+		for (const id of old) expect(ITEM_TYPES[id] ?? ITEM_TYPES[ITEM_ID_ALIASES[id] ?? ''], id).toBeDefined();
 	});
 });
 

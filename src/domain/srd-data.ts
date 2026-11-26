@@ -7,7 +7,7 @@ import type { AbilityId } from './types';
 
 /** Old (v1.1.0) item type ids → SRD ids, so saved items keep resolving. */
 export const ITEM_ID_ALIASES: Readonly<Record<string, string>> = {
-	'crossbow-light': 'crossbow-light', 'crossbow-hand': 'crossbow-hand', 'heavy-crossbow': 'crossbow-heavy',
+	'light-crossbow': 'crossbow-light', 'hand-crossbow': 'crossbow-hand', 'heavy-crossbow': 'crossbow-heavy',
 	rope: 'rope-hempen-50-feet', arrows: 'arrows-20', bolts: 'crossbow-bolts-20', lantern: 'lantern-bullseye',
 	rations: 'rations-1-day', 'healing-potion': 'potion-of-healing', 'thieves-tools': 'thieves-tools',
 };

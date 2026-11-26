@@ -166,7 +166,17 @@ for (const [k, i] of monStarts.entries()) {
 // ---- equipment --------------------------------------------------------------------------------
 const COIN = { cp: 1, sp: 10, ep: 50, gp: 100, pp: 1000 };
 const costCp = (s) => { const m = /^([\d,]+) (cp|sp|ep|gp|pp)$/.exec(s); return m ? Number(m[1].replace(/,/g, '')) * COIN[m[2]] : null; };
-const weightOf = (s) => (s === '—' ? null : /^(\d+)\/(\d+) lb\.$/.test(s) ? Number(s.split('/')[0]) / Number(/\/(\d+)/.exec(s)[1]) : /^([\d.]+) lb\.$/.test(s) ? Number(/^([\d.]+)/.exec(s)[1]) : undefined);
+const weightOf = (s) => {
+	if (s === '—') return null;
+	const mixed = /^(\d+) (\d+)\/(\d+) lb\.$/.exec(s);
+	if (mixed) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+	const vulgar = /^(\d*)([½¼¾]) lb\.$/.exec(s);
+	if (vulgar) return Number(vulgar[1] || 0) + { '½': 0.5, '¼': 0.25, '¾': 0.75 }[vulgar[2]];
+	const frac = /^(\d+)\/(\d+) lb\.$/.exec(s);
+	if (frac) return Number(frac[1]) / Number(frac[2]);
+	const num = /^([\d.]+) lb\.$/.exec(s);
+	return num ? Number(num[1]) : undefined;
+};
 const weapons = [];
 let wCat = 'Simple Melee Weapons';
 for (const l of tableLines) {
@@ -185,7 +195,7 @@ const gear = [];
 {
 	const seen = new Set();
 	for (const l of prose) {
-		const m = /^([A-Z][^|]*?) ([\d,]+) (cp|sp|ep|gp|pp) (—|[\d/.]+ lb\.)(?: \(.*\))?$/.exec(l);
+		const m = /^([A-Z][^|]*?) ([\d,]+) (cp|sp|ep|gp|pp) (—|[\d/. ½¼¾]+ lb\.)(?: \(.*\))?$/.exec(l);
 		if (!m || seen.has(m[1]) || weapons.some((w) => w.name === m[1])) continue;
 		seen.add(m[1]);
 		gear.push({ id: slug(m[1]), name: m[1], type: 'gear', costCp: costCp(`${m[2]} ${m[3]}`), weight: weightOf(m[4]), ...SRC });
