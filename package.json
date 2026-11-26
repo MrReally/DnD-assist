@@ -1,6 +1,6 @@
 {
 	"name": "canvas-assist",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"description": "D&D 5e (2014) GM assistant on top of Obsidian Canvas: navigation, combat tracker, effects, rests.",
 	"main": "main.js",
 	"type": "module",

@@ -1,0 +1,77 @@
+name: Mac package
+
+# Builds the plugin ZIP and the demo vault on a macOS runner and publishes them as WORKFLOW ARTIFACTS
+# (Actions → this run → Artifacts). It does not create a release and does not merge anything.
+# NOTE: a green run here proves "builds and unit-tests on macOS". It does NOT prove the GUI works in Obsidian on a Mac;
+# the optional smoke job below is experimental and may be skipped by GitHub runner limits.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+
+jobs:
+  package:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - run: npm run test:integration
+      - run: npm run test:perf
+      - run: npm run release
+      - name: Verify the distributable ZIP (structure, manifest, attribution, checksums)
+        run: node scripts/verify-package.mjs release/canvas-assist-$(node -p "require('./manifest.json').version").zip release/SHA256SUMS.txt
+      - name: Build the demo vault (plugin pre-installed from the ZIP)
+        run: |
+          set -euo pipefail
+          V=$(node -p "require('./manifest.json').version")
+          rm -rf /tmp/pkg && mkdir -p /tmp/pkg && unzip -q release/canvas-assist-$V.zip -d /tmp/pkg
+          node scripts/demo-vault/make-demo-vault.mjs "$RUNNER_TEMP/GM-Cockpit-Demo" /tmp/pkg/canvas-assist
+          mkdir -p out
+          (cd "$RUNNER_TEMP" && zip -qr "$GITHUB_WORKSPACE/out/GM-Cockpit-Demo-Vault-$V.zip" GM-Cockpit-Demo)
+          cp release/canvas-assist-$V.zip out/
+          cp release-assets/INSTALL.txt release-assets/FIRST-CHECK.md out/
+          (cd out && shasum -a 256 *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GM-Cockpit-mac-package
+          path: out/
+          if-no-files-found: error
+
+  mac-smoke:
+    # EXPERIMENTAL: real Obsidian GUI on the macOS runner, driven over the DevTools port. Not guaranteed to work on hosted runners.
+    needs: package
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+      - run: npm ci
+      - run: npm run release
+      - name: Install Obsidian 1.7.7
+        run: |
+          curl -fsSL -o /tmp/obsidian.dmg https://github.com/obsidianmd/obsidian-releases/releases/download/v1.7.7/Obsidian-1.7.7.dmg
+          hdiutil attach /tmp/obsidian.dmg -nobrowse -mountpoint /Volumes/ObsidianDMG
+          ls /Volumes/ObsidianDMG
+      - name: Smoke
+        env:
+          OBSIDIAN_BIN: /Volumes/ObsidianDMG/Obsidian.app/Contents/MacOS/Obsidian
+          CA_E2E_FROM_RELEASE: '1'
+        run: |
+          node tests/e2e/smoke.mjs
+          SMOKE_CORRUPT_SRD=1 node tests/e2e/smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-smoke-results
+          path: tests/e2e/out/*.json

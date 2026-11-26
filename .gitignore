@@ -11,3 +11,5 @@ data.json
 .cache/
 /tests/out/
 /srd51.json
+/NOTICE-SRD.txt
+/INSTALL.txt

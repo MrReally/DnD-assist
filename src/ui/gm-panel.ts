@@ -610,8 +610,13 @@ export class GmCockpitPanel extends ItemView {
 		const want = classId && m.abilities ? preparedSpellCount(classId, m.level, m.abilities) : null;
 		if (want !== null) card.createDiv({ cls: ['gmc-dim', book.prepared.length > want ? 'gmc-warn' : ''].filter(Boolean).join(' '), text: `Подготовлено: ${book.prepared.length} из ${want}${book.prepared.length > want ? ' — больше допустимого' : ''}`, attr: { 'data-testid': 'gmc-prepared-count' } });
 		const list = card.createDiv({ cls: 'gmc-items' });
+		let lastLevel = -1;
 		for (const sp of [...book.known].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'ru'))) {
-			const r = list.createDiv({ cls: 'gmc-item', attr: { 'data-testid': `gmc-sp-${sp.id}` } });
+			if (sp.level !== lastLevel) {
+				lastLevel = sp.level;
+				list.createDiv({ cls: 'gmc-eyebrow gmc-lvl', text: sp.level === 0 ? 'Заговоры' : `${sp.level} уровень` });
+			}
+			const r = list.createDiv({ cls: 'gmc-item gmc-item-row', attr: { 'data-testid': `gmc-sp-${sp.id}` } });
 			const name = r.createDiv({ cls: 'gmc-item-name', attr: { tabindex: '0', role: 'button' } });
 			name.createSpan({ text: sp.name });
 			name.createSpan({ cls: 'gmc-dim', text: `${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}${sp.concentration ? ' · конц.' : ''}` });

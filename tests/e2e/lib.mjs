@@ -33,6 +33,17 @@ async function freePort() {
 }
 
 /** Creates an isolated sandbox: <root>/vault (copy of fixtures), <root>/config (Obsidian profile). */
+/** Obsidian reads its global config from XDG_CONFIG_HOME on Linux and from ~/Library/Application Support on macOS (HOME is redirected into the sandbox). */
+function writeGlobalProfile(root, profile, files) {
+	const dirs = [join(profile, 'obsidian')];
+	if (process.platform === 'darwin') dirs.push(join(root, 'Library', 'Application Support', 'obsidian'));
+	if (process.platform === 'win32') dirs.push(join(root, 'AppData', 'Roaming', 'obsidian'));
+	for (const d of dirs) {
+		mkdirSync(d, { recursive: true });
+		for (const [name, data] of Object.entries(files)) writeFileSync(join(d, name), data);
+	}
+}
+
 export function createSandbox(name, extraPlugins = [], size = { width: 1440, height: 900 }) {
 	const root = join(OUT, 'sandbox', name);
 	rmSync(root, { recursive: true, force: true });
@@ -48,11 +59,25 @@ export function createSandbox(name, extraPlugins = [], size = { width: 1440, hei
 	writeFileSync(join(configDir, 'community-plugins.json'), JSON.stringify([PLUGIN_ID, ...extraPlugins.map((p) => p.id)]));
 	writeFileSync(join(configDir, 'app.json'), JSON.stringify({ promptDelete: false, alwaysUpdateLinks: true }));
 	const profile = join(root, 'config');
-	mkdirSync(join(profile, 'obsidian'), { recursive: true });
-	writeFileSync(join(profile, 'obsidian', 'obsidian.json'), JSON.stringify({ vaults: { e2evault0001: { path: vault, ts: Date.now(), open: true } }, updateDisabled: true }));
-	// Per-vault window state read by Obsidian on start: reference 13" laptop size.
-	writeFileSync(join(profile, 'obsidian', 'e2evault0001.json'), JSON.stringify({ x: 0, y: 0, width: size.width, height: size.height, isMaximized: false, devTools: false, zoom: 0 }));
+	writeGlobalProfile(root, profile, {
+		'obsidian.json': JSON.stringify({ vaults: { e2evault0001: { path: vault, ts: Date.now(), open: true } }, updateDisabled: true }),
+		// Per-vault window state read by Obsidian on start: reference 13" laptop size.
+		'e2evault0001.json': JSON.stringify({ x: 0, y: 0, width: size.width, height: size.height, isMaximized: false, devTools: false, zoom: 0 }),
+	});
 	return { root, vault, profile, configDir };
+}
+
+/** Sandbox around an already prepared vault (e.g. the demo vault): isolated profile, window size from `size`. */
+export function createSandboxFromVault(name, vault, size = { width: 1440, height: 900 }) {
+	const root = join(OUT, 'sandbox', name);
+	rmSync(root, { recursive: true, force: true });
+	mkdirSync(root, { recursive: true });
+	const profile = join(root, 'config');
+	writeGlobalProfile(root, profile, {
+		'obsidian.json': JSON.stringify({ vaults: { e2evault0001: { path: vault, ts: Date.now(), open: true } }, updateDisabled: true }),
+		'e2evault0001.json': JSON.stringify({ x: 0, y: 0, width: size.width, height: size.height, isMaximized: false, devTools: false, zoom: 0 }),
+	});
+	return { root, vault, profile, configDir: join(vault, '.obsidian') };
 }
 
 /** Installs the plugin like a user would: the three release files into <vault>/.obsidian/plugins/<id>. */

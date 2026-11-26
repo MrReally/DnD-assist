@@ -819,3 +819,6 @@ body {
 .gmc-skill { padding: 2px 0; cursor: pointer; }
 .gmc-skill:hover { color: var(--brass); }
 .gmc-skill:focus-visible { outline: 2px solid var(--arc); outline-offset: 1px; }
+.gmc-item-row { flex-direction: row; align-items: center; justify-content: space-between; }
+.gmc-item-row .gmc-item-name { flex: 1 1 auto; min-width: 0; }
+.gmc-lvl { margin-top: 6px; }
