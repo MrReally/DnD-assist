@@ -8,6 +8,8 @@
 2. **Прямо из репозитория:** папка `dist/` на ветке `claude/gm-cockpit-spec-qz2m5e` в браузере → файл → кнопка *Download raw file*: `canvas-assist-1.2.1.zip` (плагин), `GM-Cockpit-Demo-Vault-1.2.1.zip` (демо-хранилище с уже установленным плагином), `SHA256SUMS.txt`.
 Сверка суммы (по желанию, Терминал): `shasum -a 256 <файл>`; сравните с `SHA256SUMS.txt`.
 
+Подтверждено: workflow **Mac package** уже отработал на macOS-раннере (run 45834565621, коммит 177ae1a): lint, typecheck, unit/integration/perf, сборка, проверка пакета и сборка демо-хранилища — success; артефакт `GM-Cockpit-mac-package` (≈1 МБ) создан. Ссылка на запуск: https://github.com/MrReally/DnD-assist/actions/runs/45834565621 (нужен вход в GitHub).
+
 ## 2. Самый простой путь: демо-хранилище (плагин уже внутри)
 1. Двойной щелчок по `GM-Cockpit-Demo-Vault-1.2.1.zip` → папка `GM-Cockpit-Demo`. Перенесите в «Документы».
 2. Obsidian → «Открыть папку как хранилище» → `GM-Cockpit-Demo`.
