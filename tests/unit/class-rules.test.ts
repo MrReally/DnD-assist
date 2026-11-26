@@ -98,3 +98,25 @@ describe('spellcasting numbers', () => {
 		expect(arcaneRecoveryError([6], 20)).toMatch(/6 уровня и выше/);
 	});
 });
+
+describe('unarmored AC features and draconic resilience (SRD text-backed)', () => {
+	it('text', () => {
+		expect(text('barbarian')).toMatch(/Unarmored Defense[\s\S]{0,200}10 \+ your Dexterity modifier \+ your Constitution modifier/);
+		expect(text('monk')).toMatch(/Unarmored Defense[\s\S]{0,200}10 \+ your Dexterity modifier \+ your Wisdom modifier/);
+		const dr = srd.subclasses.find((s) => s.id === 'draconic-bloodline')?.text ?? '';
+		expect(dr).toMatch(/When you aren.t wearing armor, your AC equals 13 \+ your Dexterity modifier/);
+		expect(dr).toMatch(/hit point maximum increases by 1 and increases by 1 again whenever you gain a level/);
+	});
+	it('values: barbarian 10+DEX+CON, monk 10+DEX+WIS only without shield, draconic 13+DEX, armor overrides', async () => {
+		const { armorClassFor } = await import('../../src/domain/builder');
+		const { ITEM_TYPES } = await import('../../src/domain/srd-data');
+		const a = { str: 10, dex: 14, con: 16, int: 8, wis: 14, cha: 10 };
+		expect(armorClassFor(a, [], { classId: 'barbarian' })).toBe(10 + 2 + 3);
+		expect(armorClassFor(a, [ITEM_TYPES.shield!], { classId: 'barbarian' })).toBe(17);
+		expect(armorClassFor(a, [], { classId: 'monk' })).toBe(10 + 2 + 2);
+		expect(armorClassFor(a, [ITEM_TYPES.shield!], { classId: 'monk' })).toBe(12 + 2);
+		expect(armorClassFor(a, [], { classId: 'sorcerer', subclass: 'Draconic Bloodline' })).toBe(15);
+		expect(armorClassFor(a, [], { classId: 'sorcerer', subclass: 'Wild' })).toBe(12);
+		expect(armorClassFor(a, [ITEM_TYPES['chain-mail']!], { classId: 'barbarian' })).toBe(16);
+	});
+});

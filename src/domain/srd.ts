@@ -57,8 +57,9 @@ export interface SrdMonster extends SrdBase {
 	conditionImmunities: string | null;
 	senses: string | null;
 	languages: string | null;
-	cr: string;
-	xp: number;
+	/** null: the SRD text has no Challenge line for this creature (flagged verification 'incomplete'). */
+	cr: string | null;
+	xp: number | null;
 	traitsText: string;
 	actionsText: string;
 	attacks: SrdAttack[];
@@ -124,7 +125,7 @@ export interface SrdData {
 	gear: SrdGear[];
 	classes: SrdClass[];
 	races: SrdRace[];
-	subclasses: Array<SrdBase & { classId: string }>;
+	subclasses: Array<SrdBase & { classId: string; features: Array<{ name: string; level: number }>; text: string }>;
 	backgrounds: Array<SrdBase & { skills: string | null; languages: string | null }>;
 	feats: Array<SrdBase & { prerequisite: string; text: string }>;
 }

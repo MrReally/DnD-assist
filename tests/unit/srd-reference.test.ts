@@ -32,7 +32,7 @@ describe('SRD data: provenance and completeness', () => {
 			expect(r.edition).toBe('2014');
 			expect(r.source).toBe('SRD 5.1');
 			expect(r.dataVersion).toMatch(/^\d+\.\d+\.\d+$/);
-			expect(['srd-verified', 'partial']).toContain(r.verification);
+			expect(['srd-verified', 'partial', 'incomplete']).toContain(r.verification);
 		}
 	});
 	it('ids are unique within each collection', () => {
@@ -46,9 +46,11 @@ describe('SRD data: provenance and completeness', () => {
 		expect(srd.classes.length).toBe(12);
 		expect(srd.gear.length).toBeGreaterThan(100);
 	});
-	it('extraction warnings are the known, documented ones only', () => {
-		const known = srd.meta.warnings.filter((w) => !/Giant Fly|Ranger/.test(w));
-		expect(known).toEqual([]);
+	it('extraction warnings: only the Giant Fly stat block is incomplete, and it is flagged', () => {
+		expect(srd.meta.warnings.filter((w) => !/Giant Fly/.test(w))).toEqual([]);
+		const incomplete = [...srd.monsters, ...srd.classes].filter((r) => r.verification !== 'srd-verified');
+		expect(incomplete.map((r) => r.id)).toEqual(['giant-fly']);
+		expect(by(srd.monsters, 'giant-fly')).toMatchObject({ cr: null, xp: null, verification: 'incomplete', acValue: 11, hpAvg: 19 });
 	});
 });
 
@@ -178,6 +180,37 @@ describe('spells vs printed headers (typed from the PDF)', () => {
 			expect(s.concentration, s.name).toBe(/^Concentration/i.test(s.duration));
 		}
 		expect(srd.spells.filter((s) => s.level === 0).length).toBeGreaterThan(15);
+	});
+});
+
+describe('Ranger table and subclass features (typed from the PDF)', () => {
+	it('Ranger: 20 levels, spellcasting from 2, Land\'s Stride at 8, half-caster slots equal the Paladin progression', () => {
+		const r = by(srd.classes, 'ranger');
+		expect(r.levels).toHaveLength(20);
+		expect(r.levels[0]?.features).toEqual(['Favored Enemy', 'Natural Explorer']);
+		expect(r.levels[1]?.features).toEqual(['Fighting Style', 'Spellcasting']);
+		expect(r.levels[7]?.features).toContain("Land's Stride");
+		expect(r.levels[19]?.features).toEqual(['Foe Slayer']);
+		for (const row of r.levels) {
+			const slots = row.cols.filter((x) => x !== '—').map(Number).slice(1); // first column = spells known
+			expect(slots, `ranger L${row.level}`).toEqual(Object.values(spellSlotsFor('half', row.level)));
+		}
+	});
+	const feats: Record<string, Array<[string, number]>> = {
+		champion: [['Improved Critical', 3], ['Remarkable Athlete', 7], ['Additional Fighting Style', 10], ['Superior Critical', 15], ['Survivor', 18]],
+		'school-of-evocation': [['Evocation Savant', 2], ['Sculpt Spells', 2], ['Potent Cantrip', 6], ['Empowered Evocation', 10], ['Overchannel', 14]],
+		'life-domain': [['Disciple of Life', 1], ['Blessed Healer', 6], ['Divine Strike', 8], ['Supreme Healing', 17]],
+		'path-of-the-berserker': [['Frenzy', 3], ['Mindless Rage', 6], ['Intimidating Presence', 10], ['Retaliation', 14]],
+		thief: [['Fast Hands', 3], ['Second-Story Work', 3], ['Supreme Sneak', 9], ['Use Magic Device', 13]],
+		'draconic-bloodline': [['Dragon Ancestor', 1], ['Draconic Resilience', 1], ['Elemental Affinity', 6], ['Dragon Wings', 14], ['Draconic Presence', 18]],
+	};
+	it.each(Object.entries(feats))('subclass %s lists its SRD features by level', (id, list) => {
+		const s = by(srd.subclasses, id);
+		for (const [name, level] of list) expect(s.features.find((f) => f.name === name)?.level, `${id} ${name}`).toBe(level);
+		expect(s.text.length).toBeGreaterThan(500);
+	});
+	it('no foreign class text leaks into subclass feature lists', () => {
+		for (const s of srd.subclasses) for (const f of s.features) expect(f.name, s.id).not.toMatch(/^(Hit Points|Cantrips|Spellcasting|Fighting Style|Ability Score Improvement)$/);
 	});
 });
 

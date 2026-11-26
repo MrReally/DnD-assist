@@ -29,7 +29,7 @@ const pages = layout.split('\f').map(normText);
 const clean = (s) => s.replace(/\s+/g, ' ').trim();
 
 /** Full-width lines with cells separated by " | " (tables). */
-const tableLines = pages.flatMap((p) => p.split('\n').map((l) => clean(l.replace(/\s{3,}/g, ' | ')).replace(/ \| /g, ' | ')).filter(Boolean));
+const tableLines = pages.flatMap((p) => p.split('\n').map((l) => clean(l.replace(/\s{3,}/g, ' | ')).replace(/ \| /g, ' | ').replace(/\bLand s Stride\b/g, "Land's Stride")).filter(Boolean));
 /** Prose lines: every page cropped into its left and right column (pdftotext -x/-W), left first. */
 const proseLines = [];
 for (let pg = 1; pg <= pages.length - 1; pg++) {
@@ -39,7 +39,8 @@ for (let pg = 1; pg <= pages.length - 1; pg++) {
 		for (const l of normText(t).split('\n')) proseLines.push(clean(l));
 	}
 }
-const prose = proseLines.filter((l) => l && !/^System Reference Document 5\.1( \d+)?$/.test(l) && !/^\d{1,3} System Reference Document 5\.1$/.test(l) && !/^@@PAGE/.test(l) && !/^\d{1,3}$/.test(l));
+const fixText = (l) => l.replace(/\bLand s Stride\b/g, "Land's Stride");
+const prose = proseLines.map(fixText).filter((l) => l && !/^System Reference Document 5\.1( \d+)?$/.test(l) && !/^\d{1,3} System Reference Document 5\.1$/.test(l) && !/^@@PAGE/.test(l) && !/^\d{1,3}$/.test(l));
 
 if (process.env.SRD_DUMP) writeFileSync(process.env.SRD_DUMP, prose.join('\n'));
 const slug = (s) => s.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -141,7 +142,9 @@ for (const [k, i] of monStarts.entries()) {
 	const cm = /^(\S+) \(([\d,]+) XP\)/.exec(chalLine ?? '');
 	const hp = field('Hit Points');
 	const acv = field('Armor Class');
-	if (!ab || !cm || !hp || !acv) { warnings.push(`incomplete monster: ${name} (missing ${[!ab && 'abilities', !cm && 'challenge', !hp && 'hp', !acv && 'ac'].filter(Boolean).join(',')})`); continue; }
+	if (!ab || !hp || !acv) { warnings.push(`unusable monster skipped: ${name}`); continue; }
+	const incomplete = !cm;
+	if (incomplete) warnings.push(`incomplete monster kept and flagged: ${name} (no Challenge line in the SRD text)`);
 	const iAct = body.findIndex((l) => l === 'Actions');
 	const traitsStart = body.findIndex((l) => /^Challenge /.test(l)) + 1;
 	const trimTail = (t) => (/[.)]$/.test(t) ? t : t.slice(0, t.lastIndexOf('. ') + 1) || t);
@@ -158,8 +161,8 @@ for (const [k, i] of monStarts.entries()) {
 		ac: acv, acValue: Number(/^\d+/.exec(acv)?.[0]), hp: hp, hpAvg: Number(/^\d+/.exec(hp)?.[0]), hpDice: /\(([^)]+)\)/.exec(hp)?.[1]?.replace(/\s+/g, '') ?? null,
 		speed: field('Speed'), abilities: { str: ab[0], dex: ab[1], con: ab[2], int: ab[3], wis: ab[4], cha: ab[5] },
 		saves: field('Saving Throws'), skills: field('Skills'), vulnerabilities: field('Damage Vulnerabilities'), resistances: field('Damage Resistances'), immunities: field('Damage Immunities'), conditionImmunities: field('Condition Immunities'),
-		senses: field('Senses'), languages: field('Languages'), cr: cm[1], xp: Number(cm[2].replace(/,/g, '')),
-		traitsText, actionsText, attacks, ...SRC,
+		senses: field('Senses'), languages: field('Languages'), cr: cm ? cm[1] : null, xp: cm ? Number(cm[2].replace(/,/g, '')) : null,
+		traitsText, actionsText, attacks, ...SRC, ...(incomplete ? { verification: 'incomplete' } : {}),
 	});
 }
 
@@ -260,7 +263,7 @@ function parseRows(lines, name) {
 	}
 	return rows;
 }
-const clean20 = (rows) => rows.length === 20 && rows.every((r) => r.features.every((f) => f.length <= 45 && !/[.]/.test(f)));
+const clean20 = (rows) => rows.length === 20 && rows.every((r) => r.features.every((f) => f.length <= 60 && !/[.]/.test(f)));
 for (const c of classes) {
 	let rows = parseRows(tableLines, c.name);
 	if (!clean20(rows)) rows = parseRows(prose, c.name);
@@ -271,9 +274,28 @@ for (const c of classes) {
 // ---- subclasses (the SRD has exactly one per class; names are looked up as headings, never assumed) -------------
 const SUBCLASS_NAMES = { barbarian: 'Path of the Berserker', bard: 'College of Lore', cleric: 'Life Domain', druid: 'Circle of the Land', fighter: 'Champion', monk: 'Way of the Open Hand', paladin: 'Oath of Devotion', ranger: 'Hunter', rogue: 'Thief', sorcerer: 'Draconic Bloodline', warlock: 'The Fiend', wizard: 'School of Evocation' };
 const subclasses = [];
-for (const [cid, name] of Object.entries(SUBCLASS_NAMES)) {
-	if (prose.some((l) => l === name || l.startsWith(`${name} `))) subclasses.push({ id: slug(name), name, type: 'subclass', classId: cid, ...SRC });
-	else warnings.push(`subclass heading not found: ${name}`);
+{
+	const classHeads = prose.map((l, i) => (/^[A-Z][a-z]+ Class Features$|^Beyond 1st Level$|^Multiclassing$/.test(l) ? i : -1)).filter((i) => i >= 0);
+	for (const [cid, name] of Object.entries(SUBCLASS_NAMES)) {
+		const at = prose.findIndex((l, i) => (l === name || l.startsWith(`${name} `)) && i > 100 && /^[A-Z]/.test(prose[i + 1] ?? '') && i > (classHeads.find((h) => h < i) ?? 0));
+		const starts = prose.map((l, i) => (l === name ? i : -1)).filter((i) => i >= 0);
+		const start = starts.length ? starts[starts.length - 1] : -1;
+		void at;
+		if (start < 0) { warnings.push(`subclass heading not found: ${name}`); continue; }
+		const end = Math.min(...[...classHeads.filter((h) => h > start), start + 220]);
+		let seg = prose.slice(start + 1, end);
+		const cut = seg.findIndex((l) => l === 'Hit Points' || /^Hit Dice: 1d\d+ per /.test(l) || /^[A-Z][a-z]+ Class Features$/.test(l));
+		if (cut >= 0) seg = seg.slice(0, cut);
+		const features = [];
+		for (let i = 0; i < seg.length; i++) {
+			const l = seg[i];
+			if (!/^[A-Z][A-Za-z'’ -]{2,42}$/.test(l) || /\.$/.test(l)) continue;
+			const next = clean(seg.slice(i + 1, i + 4).join(' '));
+			const m = /\b(?:At|Starting at|Beginning at|By|Starting when you reach|When you reach|Upon reaching|Starting when you choose|When you choose this [a-z]+ at) (\d+)(?:st|nd|rd|th) level/i.exec(next.slice(0, 220));
+			if (m && !features.some((f) => f.name === l)) features.push({ name: l, level: Number(m[1]) });
+		}
+		subclasses.push({ id: slug(name), name, type: 'subclass', classId: cid, features, text: clean(seg.join(' ')).slice(0, 14000), ...SRC, verification: features.length ? 'srd-verified' : 'partial' });
+	}
 }
 
 // ---- races, backgrounds, feats ----------------------------------------------------------------

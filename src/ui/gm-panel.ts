@@ -10,6 +10,7 @@ import { resolveItemType } from '../domain/builder';
 import { ABILITIES, ABILITY_RU, SKILLS, carriedWeight, cockpitOf, formatCost, formatWeight, isProficientWith, itemsOf, profBonusOf, purseOf, saveBonus, signed, skillBonus, spellAttackBonus, spellDc, weaponAttack, type ItemInstance, type Purse } from '../domain/cockpit';
 import { newId } from '../domain/ids';
 import { lookupSpell } from '../domain/spell-import';
+import { getSrd } from '../domain/srd';
 import { armorClassLabel, propertyLabel } from '../domain/srd-data';
 import type { Controller } from '../controller';
 import type { Effect } from '../domain/types';
@@ -509,6 +510,21 @@ export class GmCockpitPanel extends ItemView {
 				const f = sec('Способности');
 				for (const x of sh.features) f.createDiv({ text: `${x.name}: ${x.text}` });
 			}
+			const srd = getSrd();
+			const cls = sh.classId ? srd?.classes.find((c) => c.id === sh.classId) : undefined;
+			if (cls?.levels.length) {
+				const cf = sec(`Особенности класса по уровням (SRD, до ${m.level} ур.)`);
+				for (const r of cls.levels.filter((x) => x.level <= Math.max(1, m.level))) if (r.features.length) cf.createDiv({ text: `${r.level} ур.: ${r.features.join(', ')}` });
+				cf.createDiv({ cls: 'gmc-dim', text: 'Названия из таблицы класса SRD 5.1; описания — в справочнике SRD. Неполная поддержка: автоматически считаются только перечисленные в конструкторе ресурсы.' });
+			}
+			const sc = srd?.subclasses.find((x) => x.classId === sh.classId && x.name === sh.subclass.trim());
+			if (sc) {
+				const sd = sec(`Подкласс: ${sc.name} (SRD)`);
+				for (const f of sc.features) sd.createDiv({ cls: f.level <= m.level ? '' : 'gmc-dim', text: `${f.level} ур.: ${f.name}${f.level <= m.level ? '' : ' (ещё не получена)'}` });
+				const txt = sd.createEl('details');
+				txt.createEl('summary', { text: 'Текст SRD (английский)' });
+				txt.createDiv({ cls: 'gmc-spell-text', text: sc.text });
+			} else if (sh.subclass.trim()) card.createDiv({ cls: 'gmc-dim', text: `Подкласс «${sh.subclass.trim()}» вне SRD — особенности вводятся вручную.` });
 			const ch = st.characters[id];
 			if (ch) button(card, 'Повысить уровень', () => new LevelUpModal(this.ctl, id).open(), { icon: 'arrow-up', cls: 'gmc-btn', testId: 'gmc-levelup' });
 			if (ch) card.createDiv({ cls: 'gmc-dim', text: `Скорость ${ch.speedFeet ?? '—'} фт · Кости хитов ${ch.hitDice.map((h) => `${h.remaining}/${h.total}${h.die}`).join(', ') || '—'}` });

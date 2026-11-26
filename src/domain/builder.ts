@@ -68,10 +68,17 @@ export function classById(id: string): ClassDef | undefined {
 	return CLASSES.find((c) => c.id === id);
 }
 
-export function armorClassFor(abilities: Abilities, equipped: ItemType[]): number {
+export function armorClassFor(abilities: Abilities, equipped: ItemType[], ctx: { classId?: string; subclass?: string } = {}): number {
 	const dex = abilityMod(abilities.dex);
 	const armor = equipped.find((t) => t.kind === 'armor' && t.ac);
+	const shield = equipped.some((t) => t.kind === 'shield');
 	let ac = 10 + dex;
+	if (!armor) {
+		// SRD class features that replace the unarmored base (verified against the class text in tests)
+		if (ctx.classId === 'barbarian') ac = Math.max(ac, 10 + dex + abilityMod(abilities.con));
+		if (ctx.classId === 'monk' && !shield) ac = Math.max(ac, 10 + dex + abilityMod(abilities.wis));
+		if (ctx.classId === 'sorcerer' && /draconic/i.test(ctx.subclass ?? '')) ac = Math.max(ac, 13 + dex);
+	}
 	if (armor?.ac) {
 		const d = armor.ac.dex === 'full' ? dex : armor.ac.dex === 'max2' ? Math.min(2, dex) : 0;
 		ac = armor.ac.base + d;
@@ -129,7 +136,7 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 	const { abilities, features } = abilitiesAfter(ch, warnings);
 	const conMod = abilityMod(abilities.con);
 	const avg = Math.floor(cls.hitDie / 2) + 1;
-	const hp = ch.hpOverride ?? Math.max(1, cls.hitDie + conMod + (level - 1) * Math.max(1, avg + conMod)) + (traits.hpPerLevel ?? 0) * level;
+	const hp = ch.hpOverride ?? Math.max(1, cls.hitDie + conMod + (level - 1) * Math.max(1, avg + conMod)) + ((traits.hpPerLevel ?? 0) + (cls.id === 'sorcerer' && /draconic/i.test(ch.subclass) ? 1 : 0)) * level;
 
 	const character = emptyCharacter(newId('pc'), ch.name.trim() || 'Новый персонаж', ch.notePath);
 	character.classes = [{ name: cls.ru, level }];
@@ -190,7 +197,7 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 		const equipped = t.kind === 'weapon' || t.kind === 'armor' || t.kind === 'shield';
 		items.push({ id: newId('itm'), typeId: id, name: t.ru ?? t.name, ownerKind: 'character', ownerId: character.id, containerId: null, qty: 1, equipped, magicBonus: 0, note: '' });
 	}
-	character.ac = armorClassFor(abilities, items.filter((i) => i.equipped).map((i) => types[i.typeId ?? '']).filter((t): t is ItemType => !!t));
+	character.ac = armorClassFor(abilities, items.filter((i) => i.equipped).map((i) => types[i.typeId ?? '']).filter((t): t is ItemType => !!t), { classId: cls.id, subclass: ch.subclass });
 	warnings.push('Проверьте результат по бумажному листу: он остаётся источником истины.');
 	const spellcaster = cls.caster !== 'none' || cls.id === 'warlock';
 	let book: Spellbook | undefined;
@@ -268,7 +275,7 @@ function rollDice(expr: string, rng: () => number): number {
 export function creatureFromMonster(m: SrdMonster, newId: IdFactory, rng: () => number = Math.random, opts: { role?: string; weaponId?: string | null; goldMax?: number; aliases?: string[] } = {}, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): QuickNpcResult {
 	const creatureId = newId('crt');
 	const hp = m.hpDice ? rollDice(m.hpDice, rng) : m.hpAvg;
-	const block: StatBlock = { ...structuredClone(statBlockFromMonster(m)), creatureId, role: opts.role ?? '', kind: m.xp <= 1100 && /humanoid/i.test(m.typeLine) ? 'npc' : 'monster' };
+	const block: StatBlock = { ...structuredClone(statBlockFromMonster(m)), creatureId, role: opts.role ?? '', kind: (m.xp ?? 0) <= 1100 && /humanoid/i.test(m.typeLine) ? 'npc' : 'monster' };
 	const items: ItemInstance[] = [];
 	const wt = opts.weaponId ? types[opts.weaponId] : undefined;
 	if (wt && opts.weaponId) {

@@ -71,7 +71,7 @@ const profFromCr = (cr: string): number => {
 export function statBlockFromMonster(m: SrdMonster): Omit<StatBlock, 'creatureId'> {
 	const features = (t: string): Array<{ name: string; text: string }> => (t ? [{ name: 'SRD', text: t }] : []);
 	return {
-		kind: 'monster', type: m.typeLine, role: '', cr: m.cr, profBonus: profFromCr(m.cr), abilities: { ...m.abilities },
+		kind: 'monster', type: m.typeLine, role: '', cr: m.cr ?? '?', profBonus: profFromCr(m.cr ?? '0'), abilities: { ...m.abilities },
 		saves: m.saves ?? '', skills: m.skills ?? '', resist: m.resistances ?? '', immune: m.immunities ?? '', vuln: m.vulnerabilities ?? '', conditionImmune: m.conditionImmunities ?? '',
 		senses: m.senses ?? '', languages: m.languages ?? '', speed: m.speed ?? '', traits: features(m.traitsText), actions: features(m.actionsText),
 		attacks: m.attacks.map((a) => ({ id: a.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name: a.name, bonus: a.bonus, damage: a.damage, damageType: a.damageType, range: a.range ?? a.reach ?? '', notes: a.kind })),
