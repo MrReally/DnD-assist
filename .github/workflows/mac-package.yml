@@ -74,4 +74,6 @@ jobs:
         if: always()
         with:
           name: mac-smoke-results
-          path: tests/e2e/out/*.json
+          path: |
+            tests/e2e/out/*.json
+            tests/e2e/out/screenshots/*.png

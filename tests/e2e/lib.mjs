@@ -154,7 +154,14 @@ export class ObsidianApp {
 			}
 			await sleep(300);
 		}
-		throw new Error('Окно Obsidian не найдено');
+		const urls = this.browser.contexts().flatMap((c) => c.pages().map((p) => p.url()));
+		try {
+			mkdirSync(OUT, { recursive: true });
+			writeFileSync(join(OUT, 'obsidian-launch-fail.json'), JSON.stringify({ urls, platform: process.platform, log: (this.log ?? []).join('').slice(-6000), sandbox: this.sandbox.root }, null, 2));
+		} catch {
+			// diagnostics only
+		}
+		throw new Error(`Окно Obsidian не найдено (страницы: ${JSON.stringify(urls)})`);
 	}
 
 	/** Turns restricted mode off and enables the plugin via Obsidian's own plugin manager. */
