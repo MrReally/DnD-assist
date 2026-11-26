@@ -1,0 +1,49 @@
+{
+  "platform": "linux",
+  "arch": "x64",
+  "obsidian": {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.14.4 Chrome/150.0.7871.250 Electron/43.7.7 Safari/537.36",
+    "v": "1.2.0"
+  },
+  "results": [
+    {
+      "id": "S1",
+      "title": "Плагин загружен",
+      "status": "PASS",
+      "evidence": {
+        "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.14.4 Chrome/150.0.7871.250 Electron/43.7.7 Safari/537.36",
+        "v": "1.2.0"
+      }
+    },
+    {
+      "id": "S2",
+      "title": "Справочник SRD повреждён: плагин жив, встроенный справочник отключён",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S3",
+      "title": "Двойной клик по узлу персонажа открывает карточку",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S4",
+      "title": "Правка HP сохраняется на диск",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S5",
+      "title": "Без справочника работают пользовательские данные: свой предмет и заклинание вручную",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S6",
+      "title": "Нет ошибок плагина в консоли",
+      "status": "PASS",
+      "evidence": null
+    }
+  ]
+}

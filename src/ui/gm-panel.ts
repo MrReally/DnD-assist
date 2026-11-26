@@ -29,6 +29,7 @@ type View = { k: 'card' } | { k: 'full' } | { k: 'inv' } | { k: 'weapon'; key: s
 export class GmCockpitPanel extends ItemView {
 	private unsub: (() => void) | null = null;
 	private lastKey = '';
+	private lastView = '';
 	private stack: View[] = [{ k: 'card' }];
 	private stackFor = '';
 	private slotChoice = 0;
@@ -92,7 +93,9 @@ export class GmCockpitPanel extends ItemView {
 		if (k === this.lastKey) return;
 		this.lastKey = k;
 		const root = this.contentEl;
-		const keep = root.querySelector<HTMLElement>('.gmc-body')?.scrollTop ?? 0;
+		const viewSig = `${this.ctl.cardRef?.kind}:${this.ctl.cardRef?.id}:${JSON.stringify(this.view)}`;
+		const keep = viewSig === this.lastView ? (root.querySelector<HTMLElement>('.gmc-body')?.scrollTop ?? 0) : 0;
+		this.lastView = viewSig;
 		root.empty();
 		const state = this.ctl.state;
 		const ref = this.ctl.cardRef;
@@ -136,10 +139,10 @@ export class GmCockpitPanel extends ItemView {
 		button(tools, 'Перейти', () => new GoToModal(this.ctl).open(), { icon: 'search', cls: 'gmc-btn gmc-btn-sm', title: 'Поиск по Canvas и справочнику', testId: 'gmc-goto' });
 		button(tools, 'NPC', () => new QuickNpcModal(this.ctl, (id) => this.ctl.setCard({ kind: 'creature', id })).open(), { icon: 'user-plus', cls: 'gmc-btn gmc-btn-sm', title: 'Быстрый NPC', testId: 'gmc-new-npc' });
 		button(tools, 'Персонаж', () => new BuilderModal(this.ctl, (id) => this.ctl.setTarget({ kind: 'character', id })).open(), { icon: 'user', cls: 'gmc-btn gmc-btn-sm', title: 'Новый персонаж', testId: 'gmc-new-pc' });
-		button(tools, 'Отдых', () => new RestModal(this.ctl, 'short').open(), { icon: 'tent', cls: 'gmc-btn gmc-btn-sm', title: 'Короткий отдых', testId: 'gmc-rest-short' });
-		button(tools, 'Ночь', () => new RestModal(this.ctl, 'long').open(), { icon: 'moon', cls: 'gmc-btn gmc-btn-sm', title: 'Продолжительный отдых', testId: 'gmc-rest-long' });
-		button(tools, 'Точки', () => new ViewPointsModal(this.ctl).open(), { icon: 'map-pin', cls: 'gmc-btn gmc-btn-sm', title: 'Точки обзора Canvas', testId: 'gmc-viewpoints' });
-		button(tools, 'Контр.', () => new CheckpointModal(this.ctl).open(), { icon: 'archive', cls: 'gmc-btn gmc-btn-sm', title: 'Контрольные точки Canvas', testId: 'gmc-checkpoints' });
+		button(tools, '', () => new RestModal(this.ctl, 'short').open(), { icon: 'tent', cls: 'gmc-btn gmc-btn-sm', title: 'Короткий отдых', testId: 'gmc-rest-short' });
+		button(tools, '', () => new RestModal(this.ctl, 'long').open(), { icon: 'moon', cls: 'gmc-btn gmc-btn-sm', title: 'Продолжительный отдых', testId: 'gmc-rest-long' });
+		button(tools, '', () => new ViewPointsModal(this.ctl).open(), { icon: 'map-pin', cls: 'gmc-btn gmc-btn-sm', title: 'Точки обзора Canvas', testId: 'gmc-viewpoints' });
+		button(tools, '', () => new CheckpointModal(this.ctl).open(), { icon: 'archive', cls: 'gmc-btn gmc-btn-sm', title: 'Контрольные точки Canvas', testId: 'gmc-checkpoints' });
 		this.renderParty(head, state);
 	}
 
