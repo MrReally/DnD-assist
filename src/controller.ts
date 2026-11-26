@@ -6,6 +6,13 @@ import { TtgLinkProvider, TtgOnlineSearch } from './adapters/ttg-adapter';
 import type { ActionPayload } from './domain/actions';
 import { cardTargetForNote, creatureForNote, type CardRef } from './domain/card';
 import { isRoomNote } from './domain/room';
+
+function resolveCardExists(state: AdventureState, r: CardRef): boolean {
+	if (r.kind === 'room') return true;
+	if (r.kind === 'creature') return !!state.creatures[r.id];
+	if (r.kind === 'character') return !!state.characters[r.id];
+	return !!state.activeEncounter?.combatants[r.id];
+}
 import { newId } from './domain/ids';
 import { relativeTo } from './domain/normalize';
 import type { ReducerOptions } from './domain/reducer';
@@ -116,6 +123,7 @@ export class Controller {
 
 	setTarget(t: EffectTarget | null): void {
 		if (!this.activeAdventureId) return;
+		if (!this.suppressTrail) this.pushTrail(t);
 		this.cardOverride.delete(this.activeAdventureId);
 		this.selection.set(this.activeAdventureId, t);
 		this.emit('selection');
@@ -161,8 +169,47 @@ export class Controller {
 		return this.target;
 	}
 
+	/** Cards opened before the current one (per adventure), newest last; powers "back to the previous object". */
+	private trails = new Map<string, CardRef[]>();
+
+	private pushTrail(next: CardRef | null): void {
+		const id = this.activeAdventureId;
+		if (!id) return;
+		const cur = this.cardRef;
+		if (!cur || (next && next.kind === cur.kind && next.id === cur.id)) return;
+		const t = this.trails.get(id) ?? [];
+		t.push(cur);
+		this.trails.set(id, t.slice(-8));
+	}
+
+	get previousCard(): CardRef | null {
+		const id = this.activeAdventureId;
+		const t = id ? this.trails.get(id) : undefined;
+		for (let i = (t?.length ?? 0) - 1; i >= 0; i--) {
+			const c = t?.[i];
+			if (c && this.state && resolveCardExists(this.state, c)) return c;
+		}
+		return null;
+	}
+
+	goBackCard(): void {
+		const id = this.activeAdventureId;
+		const prev = this.previousCard;
+		if (!id || !prev) return;
+		const t = this.trails.get(id) ?? [];
+		while (t.length && t[t.length - 1] !== prev) t.pop();
+		t.pop();
+		this.trails.set(id, t);
+		this.suppressTrail = true;
+		this.setCard(prev);
+		this.suppressTrail = false;
+	}
+
+	private suppressTrail = false;
+
 	setCard(r: CardRef | null): void {
 		if (!this.activeAdventureId) return;
+		if (!this.suppressTrail) this.pushTrail(r);
 		if (r && r.kind !== 'creature' && r.kind !== 'room') {
 			this.cardOverride.delete(this.activeAdventureId);
 			this.setTarget(r);

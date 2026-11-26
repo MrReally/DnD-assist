@@ -82,7 +82,7 @@ export class GoToModal extends Modal {
 			}
 			for (const sp of searchSpells(this.ctl.settings.spells, this.q, 8)) {
 				const tid = this.ctl.target?.kind === 'character' ? this.ctl.target.id : null;
-				ref.push({ title: sp.name, sub: `Заклинание · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}${sp.origin === 'srd' ? ' · SRD' : ''}`, actions: [{ label: 'Добавить персонажу', testId: 'goto-spell', run: () => new SpellImportModal(this.ctl, tid, () => undefined).open() }] });
+				ref.push({ title: sp.name, sub: `Заклинание · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}${sp.origin === 'srd' ? ' · SRD' : ''}`, actions: tid ? [{ label: 'Добавить персонажу', testId: 'goto-spell', run: () => this.addSpell(tid, sp) }] : [{ label: 'Открыть библиотеку', testId: 'goto-spell-lib', run: () => new SpellImportModal(this.ctl, null, () => undefined).open() }] });
 			}
 			const owner = this.ownerOfTarget();
 			const types: ItemType[] = [...Object.values(cockpitOf(st).itemTypes), ...Object.values(ITEM_TYPES)].filter((t) => has(`${t.name} ${t.ru ?? ''}`)).slice(0, 8);
@@ -141,6 +141,16 @@ export class GoToModal extends Modal {
 		this.ctl.setCard({ kind: 'creature', id: r.creature.id });
 		this.close();
 		this.ctl.showPanel();
+	}
+
+	/** Adds the spell to the character's spellbook in one step (SRD spells need no import). */
+	private async addSpell(characterId: string, sp: { id: string; name: string; level: number; concentration: boolean }): Promise<void> {
+		const st = this.ctl.state;
+		if (!st) return;
+		const book = cockpitOf(st).spellbooks[characterId] ?? { known: [], prepared: [] };
+		if (book.known.some((k) => k.id === sp.id)) return void new Notice(`«${sp.name}» уже у персонажа`);
+		const out = await this.ctl.act({ type: 'cockpit/spellbook-set', characterId, book: { known: [...book.known, { id: sp.id, name: sp.name, level: sp.level, concentration: sp.concentration }], prepared: book.prepared } });
+		if (out.ok) new Notice(`«${sp.name}» добавлено`);
 	}
 
 	private async createItem(t: ItemType, owner: { kind: 'character' | 'creature'; id: string }): Promise<void> {

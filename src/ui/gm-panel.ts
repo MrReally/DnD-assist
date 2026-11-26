@@ -85,7 +85,7 @@ export class GmCockpitPanel extends ItemView {
 		const c = this.ctl;
 		const ref = c.cardRef;
 		const enc = c.state?.activeEncounter;
-		return [c.activeAdventureId, c.state?.revision, c.store?.info.mode, ref?.kind, ref?.id, JSON.stringify(this.stack), this.slotChoice, enc?.activeSlotId, enc?.round, c.settings.spells.length, c.settings.cues.length].join('|');
+		return [c.activeAdventureId, c.state?.revision, c.store?.info.mode, ref?.kind, ref?.id, JSON.stringify(this.stack), this.slotChoice, enc?.activeSlotId, enc?.round, c.settings.spells.length, c.settings.cues.length, c.previousCard?.id].join('|');
 	}
 
 	private render(): void {
@@ -133,6 +133,7 @@ export class GmCockpitPanel extends ItemView {
 		const head = root.createDiv({ cls: 'gmc-head' });
 		const top = head.createDiv({ cls: 'gmc-row gmc-between' });
 		if (this.stack.length > 1) button(top, 'Назад', () => this.back(), { icon: 'arrow-left', cls: 'gmc-btn gmc-btn-g', testId: 'gmc-back' });
+		else if (this.ctl.previousCard) button(top, '', () => this.ctl.goBackCard(), { icon: 'undo-2', title: 'К предыдущему объекту', cls: 'gmc-btn gmc-btn-g', testId: 'gmc-prev-card' });
 		top.createEl('h3', { text: state?.name ?? 'GM Cockpit', cls: 'gmc-serif' });
 		if (!state) return;
 		const tools = head.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap gmc-tools' });

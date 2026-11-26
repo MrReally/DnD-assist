@@ -9,7 +9,7 @@
     {
       "id": "S1",
       "title": "Перехват двойного клика по узлу Canvas",
-      "ms": 1052,
+      "ms": 1063,
       "status": "PASS",
       "did": "Реальный двойной клик мышью (CDP Input) по заголовку файлового узла; capture-слушатель dblclick на document; затем слушатель, гасящий событие (stopPropagation).",
       "result": {
@@ -36,7 +36,7 @@
     {
       "id": "S2",
       "title": "Стилизация узлов Canvas (рамка выбора, метка типа)",
-      "ms": 519,
+      "ms": 521,
       "status": "PASS",
       "did": "Инъекция CSS по .canvas-node.is-focused .canvas-node-container (в 1.14.4 класс выделения — is-focused); реальный клик; чтение computed style.",
       "result": {
@@ -51,7 +51,7 @@
     {
       "id": "S3",
       "title": "Оверлеи (NavChip / PartyDock / лента) поверх области Canvas",
-      "ms": 334,
+      "ms": 342,
       "status": "PASS",
       "did": "Элемент position:absolute в .view-content Canvas-листа; elementFromPoint; реальный клик; колесо мыши по Canvas после.",
       "result": {
@@ -87,7 +87,7 @@
     {
       "id": "S4",
       "title": "Программное задание положения и масштаба (точки обзора)",
-      "ms": 488,
+      "ms": 487,
       "status": "PASS",
       "did": "Зонд методов Canvas; setViewport(x,y,zoom) либо запись tx/ty/tZoom; чтение через 400 мс; координаты узла в DOM.",
       "result": {
@@ -145,7 +145,7 @@
     {
       "id": "S5",
       "title": "Контрольные точки: сохранение/восстановление раскладки без игровых данных",
-      "ms": 4012,
+      "ms": 4010,
       "status": "PASS",
       "did": "Копия .canvas в .canvas-assist-checkpoints; правка холста через Vault.modify при открытом Canvas; восстановление с защитной копией; сравнение числа узлов в живом view и на диске, сравнение HP в состоянии.",
       "result": {
@@ -163,7 +163,7 @@
     {
       "id": "S6",
       "title": "Определение выбранного узла и связь узел↔заметка",
-      "ms": 1241,
+      "ms": 1235,
       "status": "PASS",
       "did": "Реальный клик по узлу; чтение canvas.selection, node.file.path; слушатель pointerup (capture) на wrapperEl + двойной requestAnimationFrame для чтения выбора (microtask читает выбор слишком рано — Canvas обновляет selection после pointerup).",
       "result": {
@@ -190,7 +190,7 @@
     {
       "id": "S7",
       "title": "Изменение ширины боковой панели и сворачивание в рельс",
-      "ms": 2590,
+      "ms": 2606,
       "status": "PASS",
       "did": "Открыта панель Canvas Assist в правой боковой панели; перетаскивание левого края мышью; setSize(340/380/420); collapse/expand.",
       "result": {

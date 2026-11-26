@@ -62,6 +62,7 @@ export async function addCreatureToCombat(ctl: Controller, creatureId: string, c
 
 export class QuickNpcModal extends Modal {
 	private query = '';
+	private count = 1;
 	constructor(private readonly ctl: Controller, private readonly onDone: (creatureId: string) => void) {
 		super(ctl.app);
 	}
@@ -71,6 +72,7 @@ export class QuickNpcModal extends Modal {
 		const el = this.contentEl;
 		el.createEl('p', { cls: 'gmc-dim', text: 'Например: «Гоблин-посетитель таверны с кинжалом». Шаблоны: SRD 5.1. Масштабирования под уровень партии нет.' });
 		const input = field(el, 'Описание', '', (v) => (this.query = v), 'qn-query');
+		field(el, 'Сколько в бой (у каждого свои HP и состояния)', '1', (v) => (this.count = Math.max(1, Math.min(20, Math.floor(Number(v)) || 1))), 'qn-count', 'number');
 		const out = el.createDiv({ cls: 'gmc-qn-out', attr: { 'data-testid': 'qn-out' } });
 		const row = el.createDiv({ cls: 'gmc-row gmc-gap' });
 		const go = (toCombat: boolean): void => void this.create(out, toCombat);
@@ -91,7 +93,7 @@ export class QuickNpcModal extends Modal {
 		}
 		const res = await this.ctl.act({ type: 'cockpit/npc-create', creature: r.creature, statblock: r.statblock, items: r.items, purse: r.purse });
 		if (!res.ok) return;
-		if (toCombat) await addCreatureToCombat(this.ctl, r.creature.id);
+		if (toCombat) await addCreatureToCombat(this.ctl, r.creature.id, this.count);
 		new Notice(`Создан: ${r.creature.name}. ${r.note}`);
 		this.onDone(r.creature.id);
 		this.close();

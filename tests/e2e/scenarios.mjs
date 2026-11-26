@@ -70,9 +70,10 @@ async function waitText(id, re, ms = 6000) {
 	throw new Error(`timeout waiting ${id} ~ ${re}; got "${await L(id).first().innerText().catch(() => '<none>')}"`);
 }
 async function fillModal(id, text) { const l = L(id); await l.waitFor({ timeout: 5000 }); await l.fill(text); }
-async function newNpc(query, toCombat) {
+async function newNpc(query, toCombat, count = 1) {
 	await L('gmc-new-npc').click();
 	await fillModal('qn-query', query);
+	if (count > 1) await fillModal('qn-count', String(count));
 	await L(toCombat ? 'qn-combat' : 'qn-create').click();
 	await app.page.locator('.modal-container').waitFor({ state: 'detached', timeout: 5000 });
 	await sleep(250);
@@ -437,6 +438,13 @@ await step('S', 'Перейти: две группы; переход к узлу
 	await L('gmc-card').waitFor();
 	assert(/Bandit/.test(await L('gmc-name').innerText()), 'bandit card opened');
 	assert((await app.eval(() => window.app.workspace.getLeavesOfType('canvas')[0].view.canvas.nodes.size)) === nodesBefore, 'canvas untouched by search');
+	// spell straight into the spellbook of the selected character (SRD spell, no import dialog)
+	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), alexId);
+	await L('gmc-goto').click();
+	await fillModal('goto-input', 'magic missile');
+	await L('goto-spell').first().click();
+	await sleep(500);
+	assert((await state()).extensions.cockpit.spellbooks[alexId].known.some((k) => k.id === 'magic-missile'), 'SRD spell added to the spellbook in one step');
 	// item instance for the card owner
 	await L('gmc-goto').click();
 	await fillModal('goto-input', 'длинный меч');
@@ -465,7 +473,10 @@ await step('S', 'Перейти: две группы; переход к узлу
 // ---------------------------------------------------------------- A: tavern brawl
 await step('A', 'Драка в таверне: партия + 6 NPC, инициатива, ходы, урон, состояния, завершение, Canvas цел', async () => {
 	await L('gmc-new-npc').waitFor();
-	for (const q of ['Бандит', 'Бандит', 'Бандит', 'Стражник', 'Головорез', 'Простолюдин']) await newNpc(q, true);
+	for (const q of ['Бандит', 'Бандит', 'Бандит', 'Стражник', 'Головорез']) await newNpc(q, true);
+	await newNpc('Простолюдин', true, 2);
+	const commoners = Object.values((await state()).activeEncounter.combatants).filter((c) => /Commoner/.test(c.displayName));
+	assert(commoners.length === 2 && new Set(commoners.map((c) => c.id)).size === 2 && commoners.every((c) => c.hp.max === commoners[0].hp.max), 'a group of two commoners: separate combatants, own HP');
 	let s = await state();
 	const enc = s.activeEncounter;
 	const cmbs = Object.values(enc.combatants);
@@ -653,6 +664,16 @@ await step('K', 'Клавиатура (Tab/Enter), утечки обработч
 	void m0;
 	assert(idle < 0.05, `idle main-thread load ${(idle * 100).toFixed(1)}%`);
 	return { listeners: after.l, heapDeltaMiB: Math.round((after.h - before.h) / 1048576 * 10) / 10, idleLoadPct: Math.round(idle * 1000) / 10 };
+});
+
+// ---------------------------------------------------------------- N: back to the previous object
+await step('N', 'Возврат к предыдущему объекту одной кнопкой', async () => {
+	await closeModals();
+	await app.eval((a, b) => { const c = window.canvasAssist.ctl; c.setTarget({ kind: 'character', id: a }); c.setTarget({ kind: 'character', id: b }); }, alexId, evidence.borin);
+	await L('gmc-prev-card').click();
+	await sleep(300);
+	assert((await app.eval(() => window.canvasAssist.ctl.cardRef.id)) === alexId, 'back to the previous card');
+	assert((await L('gmc-name').innerText()) === 'Алекс', 'panel shows the previous object');
 });
 
 // ---------------------------------------------------------------- L: light failure never double-spends resources
