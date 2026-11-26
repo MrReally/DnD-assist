@@ -1,0 +1,59 @@
+{
+  "platform": "linux",
+  "arch": "x64",
+  "obsidian": {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.7.7 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36",
+    "v": "1.2.1"
+  },
+  "results": [
+    {
+      "id": "S1",
+      "title": "Плагин загружен",
+      "status": "PASS",
+      "evidence": {
+        "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) obsidian/1.7.7 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36",
+        "v": "1.2.1"
+      }
+    },
+    {
+      "id": "S2",
+      "title": "Справочник SRD загружен офлайн из папки плагина",
+      "status": "PASS",
+      "evidence": {
+        "spells": 319,
+        "monsters": 319,
+        "weapons": 37,
+        "armor": 13,
+        "gear": 147,
+        "classes": 12,
+        "races": 13,
+        "backgrounds": 1,
+        "feats": 1
+      }
+    },
+    {
+      "id": "S3",
+      "title": "Двойной клик по узлу персонажа открывает карточку",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S4",
+      "title": "Правка HP сохраняется на диск",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S5",
+      "title": "Быстрый NPC и оружие из SRD (кинжал: 2 зм)",
+      "status": "PASS",
+      "evidence": null
+    },
+    {
+      "id": "S6",
+      "title": "Нет ошибок плагина в консоли",
+      "status": "PASS",
+      "evidence": null
+    }
+  ]
+}

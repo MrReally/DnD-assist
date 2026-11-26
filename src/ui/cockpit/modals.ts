@@ -19,6 +19,13 @@ import { button } from '../common';
 import type { AbilityId } from '../../domain/types';
 
 const tid = (el: HTMLElement, id: string): void => void (el.dataset.testid = id);
+/** Focus the first field after the modal opened, but never steal focus from a field the user is already in. */
+function focusSoon(root: HTMLElement, el: HTMLElement): void {
+	window.setTimeout(() => {
+		const a = document.activeElement;
+		if (!a || !root.contains(a) || a === document.body) el.focus();
+	}, 30);
+}
 const ab = (v: string): AbilityId | undefined => ABILITIES.find((a) => a === v);
 
 function field(parent: HTMLElement, label: string, init: string, onInput: (v: string) => void, testId?: string, type = 'text'): HTMLInputElement {
@@ -81,7 +88,7 @@ export class QuickNpcModal extends Modal {
 		input.addEventListener('keydown', (e) => {
 			if (e.key === 'Enter') go(false);
 		});
-		window.setTimeout(() => input.focus(), 30);
+		focusSoon(this.contentEl, input);
 	}
 
 	private async create(out: HTMLElement, toCombat: boolean): Promise<void> {
@@ -138,7 +145,7 @@ export class AddItemModal extends Modal {
 		const c = custom.createEl('input', { cls: 'gmc-input', type: 'number', attr: { placeholder: 'цена, зм' } });
 		c.addEventListener('input', () => (cost = Math.max(0, Math.round(Number(c.value) * 100) || 0)));
 		button(custom, 'Добавить', () => void this.addCustom(name, cost), { cls: 'gmc-btn', testId: 'ai-custom-add' });
-		window.setTimeout(() => f.focus(), 30);
+		focusSoon(this.contentEl, f);
 	}
 
 	private fill(list: HTMLElement): void {
@@ -219,6 +226,8 @@ export class BuilderModal extends Modal {
 
 	override onOpen(): void {
 		this.titleEl.setText('Новый персонаж');
+		this.modalEl.addClass('gmc-modal-wide');
+		this.contentEl.addClass('gmc-modal-scroll');
 		this.render();
 	}
 
@@ -260,11 +269,26 @@ export class BuilderModal extends Modal {
 		return c === null ? 'Набор вне покупки очков (8–15): допустим, если так решил мастер' : `Покупка очков: ${c} из 27`;
 	}
 
+	private filters = new Map<string, string>();
+
 	private pickGroup(el: HTMLElement, title: string, items: Array<{ id: string; label: string }>, selected: string[], max: number, onChange: (v: string[]) => void, tidPrefix: string): void {
 		el.createDiv({ cls: 'gmc-eyebrow', text: `${title}: ${selected.length} из ${max}` });
+		const labels: Array<{ lab: HTMLElement; text: string; id: string }> = [];
+		const apply = (q: string): void => {
+			const n = q.trim().toLowerCase();
+			for (const l of labels) l.lab.style.display = !n || l.text.includes(n) || selected.includes(l.id) ? '' : 'none';
+		};
+		if (items.length > 24) {
+			const f = el.createEl('input', { cls: 'gmc-input', type: 'text', value: this.filters.get(tidPrefix) ?? '', attr: { placeholder: 'Фильтр по названию', 'aria-label': `Фильтр: ${title}`, 'data-testid': `${tidPrefix}-filter` } });
+			f.addEventListener('input', () => {
+				this.filters.set(tidPrefix, f.value);
+				apply(f.value);
+			});
+		}
 		const row = el.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap gmc-picklist' });
 		for (const it of items) {
 			const lab = row.createEl('label', { cls: 'gmc-check' });
+			labels.push({ lab, text: it.label.toLowerCase(), id: it.id });
 			const cb = lab.createEl('input', { type: 'checkbox', attr: { 'data-testid': `${tidPrefix}-${it.id}` } });
 			cb.checked = selected.includes(it.id);
 			cb.disabled = !cb.checked && selected.length >= max;
@@ -274,6 +298,7 @@ export class BuilderModal extends Modal {
 			});
 			lab.createSpan({ text: it.label });
 		}
+		apply(this.filters.get(tidPrefix) ?? '');
 	}
 
 	private renderRules(el: HTMLElement): void {

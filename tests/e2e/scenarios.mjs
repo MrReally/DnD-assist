@@ -194,10 +194,17 @@ await step('W', 'Приёмочный персонаж: высший эльф, �
 	await L('bd-subclass-select').selectOption('School of Evocation');
 	await L('bd-asi-0').selectOption('+2:int');
 	await L('bd-skill-arcana').check(); await L('bd-skill-history').check();
+	await L('bd-spell-filter').fill('fireball');
+	assert(await L('bd-spell-fireball').isVisible() && !(await L('bd-spell-magic-missile').isVisible()), 'spell filter hides non-matching entries');
+	await L('bd-spell-filter').fill('');
 	for (const id of cantrips) await L(`bd-cantrip-${id}`).check();
 	for (const id of book) await L(`bd-spell-${id}`).check();
 	for (const id of book.slice(0, 9)) await L(`bd-prep-${id}`).check();
 	await L('bd-gear-quarterstaff').check(); await L('bd-gear-dagger').check(); await L('bd-gear-spellbook').check(); await L('bd-gear-component-pouch').check();
+	await L('bd-name').scrollIntoViewIfNeeded();
+	await app.screenshot('scn-w-builder-top');
+	await L('bd-submit').scrollIntoViewIfNeeded();
+	await app.screenshot('scn-w-builder-bottom');
 	await L('bd-submit').click();
 	await app.page.locator('.modal-container').waitFor({ state: 'detached', timeout: 8000 });
 	const s = await state();

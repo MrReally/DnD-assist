@@ -37,7 +37,9 @@ export class GoToModal extends Modal {
 			void this.render();
 		});
 		void this.render();
-		window.setTimeout(() => input.focus(), 30);
+		window.setTimeout(() => {
+			if (!this.contentEl.contains(document.activeElement)) input.focus();
+		}, 30);
 	}
 
 	private async render(): Promise<void> {

@@ -822,3 +822,6 @@ body {
 .gmc-item-row { flex-direction: row; align-items: center; justify-content: space-between; }
 .gmc-item-row .gmc-item-name { flex: 1 1 auto; min-width: 0; }
 .gmc-lvl { margin-top: 6px; }
+.gmc-modal-wide { width: min(780px, 94vw); }
+.gmc-modal-scroll { max-height: 78vh; overflow-y: auto; }
+.gmc-picklist { max-height: 220px; overflow-y: auto; padding: 4px; border: 1px solid var(--background-modifier-border); border-radius: 6px; }
