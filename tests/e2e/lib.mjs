@@ -102,7 +102,9 @@ export class ObsidianApp {
 		const bin = obsidianBinary();
 		if (!bin) throw new Error('BLOCKED: REAL_OBSIDIAN_E2E — Obsidian binary not found (set OBSIDIAN_BIN)');
 		this.port = await freePort();
-		const args = ['--no-sandbox', `--remote-debugging-port=${this.port}`, '--disable-gpu', '--force-device-scale-factor=1', `--window-size=${this.opts.width ?? 1440},${this.opts.height ?? 900}`];
+		// macOS ignores $HOME for the user directory (it uses the account database), so the profile is passed explicitly.
+		const userData = process.platform === 'linux' ? [] : [`--user-data-dir=${join(this.sandbox.profile, 'obsidian')}`];
+		const args = [...userData, '--no-sandbox', `--remote-debugging-port=${this.port}`, '--disable-gpu', '--force-device-scale-factor=1', `--window-size=${this.opts.width ?? 1440},${this.opts.height ?? 900}`];
 		if (this.opts.offline) args.push('--proxy-server=http://127.0.0.1:9', '--proxy-bypass-list=<-loopback>');
 		const env = { ...process.env, HOME: this.sandbox.root, XDG_CONFIG_HOME: this.sandbox.profile, LANG: 'ru_RU.UTF-8' };
 		if (this.opts.offline) {
