@@ -69,7 +69,7 @@ export class GoToModal extends Modal {
 			ref.push({ title: c.name, sub: 'Персонаж', actions: [{ label: 'В панель', testId: 'goto-panel', run: () => this.ctl.setTarget({ kind: 'character', id: c.id }) }, { label: 'На Canvas', testId: 'goto-add', run: () => this.addToCanvas(charPath(c.notePath)) }] });
 		}
 		for (const cr of Object.values(st.creatures)) {
-			if (!has(cr.name)) continue;
+			if (!has(`${cr.name} ${cr.aliases.join(' ')}`)) continue;
 			const notePath = cr.source?.provider === 'note' ? charPath(cr.source.ref) : null;
 			if (notePath && onCanvasFiles.has(notePath)) continue;
 			ref.push({ title: cr.name, sub: 'Существо', actions: [{ label: 'В панель', testId: 'goto-panel', run: () => this.ctl.setCard({ kind: 'creature', id: cr.id }) }, { label: 'В бой', testId: 'goto-combat', run: () => void addCreatureToCombat(this.ctl, cr.id) }, { label: 'На Canvas', testId: 'goto-add', run: () => this.addCreature(cr.id) }] });
@@ -85,9 +85,9 @@ export class GoToModal extends Modal {
 				ref.push({ title: sp.name, sub: `Заклинание · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}${sp.origin === 'srd' ? ' · SRD' : ''}`, actions: [{ label: 'Добавить персонажу', testId: 'goto-spell', run: () => new SpellImportModal(this.ctl, tid, () => undefined).open() }] });
 			}
 			const owner = this.ownerOfTarget();
-			const types: ItemType[] = [...Object.values(cockpitOf(st).itemTypes), ...Object.values(ITEM_TYPES)].filter((t) => has(t.name)).slice(0, 8);
+			const types: ItemType[] = [...Object.values(cockpitOf(st).itemTypes), ...Object.values(ITEM_TYPES)].filter((t) => has(`${t.name} ${t.ru ?? ''}`)).slice(0, 8);
 			for (const t of types) {
-				ref.push({ title: t.name, sub: `Предмет · ${formatCost(t.costCp)}${t.damage ? ` · ${t.damage}` : ''}`, actions: owner ? [{ label: 'Создать экземпляр', testId: 'goto-item', run: () => void this.createItem(t, owner) }] : [] });
+				ref.push({ title: t.ru ? `${t.ru} (${t.name})` : t.name, sub: `Предмет · ${formatCost(t.costCp)}${t.damage ? ` · ${t.damage}` : ''}`, actions: owner ? [{ label: 'Создать экземпляр', testId: 'goto-item', run: () => void this.createItem(t, owner) }] : [] });
 			}
 		}
 		this.group(host, 'В справочнике, не на Canvas', ref.slice(0, 24), 'goto-group-ref');
@@ -134,7 +134,7 @@ export class GoToModal extends Modal {
 		const m = monsterById(monsterId);
 		if (!m) return;
 		const tpl = CREATURE_TEMPLATES.find((t) => t.monsterId === monsterId);
-		const r = creatureFromMonster(m, newId, Math.random, { goldMax: tpl?.goldMax ?? 0 });
+		const r = creatureFromMonster(m, newId, Math.random, { goldMax: tpl?.goldMax ?? 0, aliases: tpl?.keys ?? [] });
 		const out = await this.ctl.act({ type: 'cockpit/npc-create', creature: r.creature, statblock: r.statblock, items: r.items, purse: r.purse });
 		if (!out.ok) return;
 		if (toCombat) await addCreatureToCombat(this.ctl, r.creature.id);
@@ -144,7 +144,7 @@ export class GoToModal extends Modal {
 	}
 
 	private async createItem(t: ItemType, owner: { kind: 'character' | 'creature'; id: string }): Promise<void> {
-		const out = await this.ctl.act({ type: 'cockpit/item-upsert', item: { id: newId('itm'), typeId: t.id, name: t.name, ownerKind: owner.kind, ownerId: owner.id, containerId: null, qty: 1, equipped: false, magicBonus: 0, note: '' } });
+		const out = await this.ctl.act({ type: 'cockpit/item-upsert', item: { id: newId('itm'), typeId: t.id, name: t.ru ?? t.name, ownerKind: owner.kind, ownerId: owner.id, containerId: null, qty: 1, equipped: false, magicBonus: 0, note: '' } });
 		if (out.ok) new Notice(`«${t.name}» добавлен`);
 	}
 

@@ -91,7 +91,7 @@ await act({ type: 'character/set-slot', characterId: alexId, level: '1', slot: {
 await step('B', 'Внезапный гоблин: быстрый NPC → статблок → кинжал (цена/свойства/бонус/урон) → в бой', async () => {
 	await newNpc('Гоблин-посетитель таверны с кинжалом', false);
 	await L('gmc-card').waitFor();
-	assert(/Гоблин/.test(await L('gmc-name').innerText()), 'name');
+	assert(/Goblin/.test(await L('gmc-name').innerText()), 'name');
 	assert(await L('gmc-hp-text').innerText().then((t) => /\d+ \/ \d+/.test(t)), 'hp shown');
 	const atk = L('gmc-attack-dagger');
 	assert(/\+4/.test(await atk.locator('[data-testid=gmc-attack-bonus]').innerText()), 'attack bonus +4');
@@ -156,9 +156,13 @@ await step('P3c', 'Повышение уровня и правка листа в
 	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), evidence.borin);
 	await L('gmc-full').click();
 	await L('gmc-levelup').click();
+	await L('lu-asi').selectOption('str');
+	await L('lu-apply').click();
+	await app.page.locator('.modal-container').waitFor({ state: 'detached', timeout: 5000 });
 	await sleep(600);
 	let b = (await state()).characters[evidence.borin];
 	assert(b.classes[0].level === 4 && b.hp.max === 28 + 8, `level ${b.classes[0].level} hp ${b.hp.max}`); // d10 avg 6 + CON 2
+	assert((await state()).extensions.cockpit.sheets[evidence.borin].abilities.str === 17, 'ASI +2 STR chosen by the player (15 → 17)');
 	assert(b.hitDice[0].total === 4, 'hit dice');
 	await app.page.locator('details:has([data-testid=gmc-skill-stealth]) > summary').click();
 	await L('gmc-skill-stealth').click();
@@ -169,6 +173,76 @@ await step('P3c', 'Повышение уровня и правка листа в
 	await L('gmc-back').click();
 	// longsword attack now uses STR 18 (+4) + prof (+2 at level 4) = +6
 	assert((await L('gmc-attacks').innerText()).includes('+6'), `attack ${await L('gmc-attacks').innerText()}`);
+});
+
+await step('W', 'Приёмочный персонаж: высший эльф, волшебник 5, предыстория «Преступник» (вручную) — через интерфейс', async () => {
+	const srd = JSON.parse(readFileSync(join(REPO, 'data', 'srd51', 'srd51.json'), 'utf8'));
+	const wiz = (lvl, n, skip = 0) => srd.spells.filter((s) => s.level === lvl && s.classes.includes('wizard')).slice(skip, skip + n).map((s) => s.id);
+	const cantrips = wiz(0, 5); const book = [...wiz(1, 8), ...wiz(2, 4), ...wiz(3, 2)];
+	await L('gmc-new-pc').click();
+	await fillModal('bd-name', 'Эльфийка');
+	await L('bd-race').selectOption('elf');
+	await L('bd-subrace').selectOption('high-elf');
+	await L('bd-class').selectOption('wizard');
+	await fillModal('bd-level', '5');
+	await app.page.locator('[data-testid=bd-level]').press('Tab');
+	await sleep(300);
+	for (const [a, v] of [['str', 8], ['dex', 14], ['con', 13], ['int', 15], ['wis', 12], ['cha', 10]]) await fillModal(`bd-ab-${a}`, String(v));
+	await fillModal('bd-bgname', 'Criminal');
+	await L('bd-bgskill-deception').check(); await L('bd-bgskill-stealth').check();
+	await L('bd-subclass-select').selectOption('School of Evocation');
+	await L('bd-asi-0').selectOption('+2:int');
+	await L('bd-skill-arcana').check(); await L('bd-skill-history').check();
+	for (const id of cantrips) await L(`bd-cantrip-${id}`).check();
+	for (const id of book) await L(`bd-spell-${id}`).check();
+	for (const id of book.slice(0, 9)) await L(`bd-prep-${id}`).check();
+	await L('bd-gear-quarterstaff').check(); await L('bd-gear-dagger').check(); await L('bd-gear-spellbook').check(); await L('bd-gear-component-pouch').check();
+	await L('bd-submit').click();
+	await app.page.locator('.modal-container').waitFor({ state: 'detached', timeout: 8000 });
+	const s = await state();
+	const ch = Object.values(s.characters).find((c) => c.name === 'Эльфийка');
+	const sh = s.extensions.cockpit.sheets[ch.id];
+	assert(JSON.stringify(sh.abilities) === JSON.stringify({ str: 8, dex: 16, con: 13, int: 18, wis: 12, cha: 10 }), JSON.stringify(sh.abilities));
+	assert(ch.hp.max === 27 && ch.ac === 13, `hp ${ch.hp.max} ac ${ch.ac}`);
+	assert(JSON.stringify(ch.spellSlots) === JSON.stringify({ '1': { max: 4, current: 4 }, '2': { max: 3, current: 3 }, '3': { max: 2, current: 2 } }), 'slots');
+	assert(ch.counters['arcane-recovery']?.max === 1, 'arcane recovery counter');
+	const bk = s.extensions.cockpit.spellbooks[ch.id];
+	assert(bk.known.length === 19 && bk.prepared.length === 9, `book ${bk.known.length}/${bk.prepared.length}`);
+	await L('gmc-spells').click();
+	assert((await L('gmc-prepared-count').innerText()).includes('9 из 9'), 'prepared counter in the UI');
+	await L('gmc-back').click();
+	await L('gmc-full').click();
+	assert((await L('gmc-full-card').innerText()).includes('Сл заклинаний 15 · атака заклинанием +7'), 'spell DC / attack shown');
+	await app.screenshot('scn-w-wizard');
+	evidence.wiz = ch.id;
+	await L('gmc-back').click();
+});
+
+await step('W2', 'Отдых волшебника в интерфейсе: магическое восстановление (выбор игрока, бюджет 3), Undo, повторное использование запрещено', async () => {
+	const id = evidence.wiz;
+	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), id);
+	for (const [lv, max] of [['1', 4], ['2', 3], ['3', 2]]) await act({ type: 'character/set-slot', characterId: id, level: lv, slot: { max, current: 0 } });
+	await L('gmc-rest-short').click();
+	await L('rest-arcane').waitFor();
+	const row = (t) => app.page.locator('[data-testid=rest-arcane] .setting-item', { hasText: t });
+	await row('Ячейка 3 ур. (1-я').locator('.checkbox-container').click();
+	await sleep(300);
+	assert((await L('rest-preview').innerText()).includes('Магическое восстановление, ячейки 3 ур.: 0 → 1'), 'preview shows the chosen slot');
+	await row('Ячейка 2 ур. (1-я').locator('.checkbox-container').click();
+	await sleep(300);
+	assert(/больше допустимого 3/.test(await L('rest-error').innerText()), 'over budget blocked');
+	assert(await L('rest-apply').isDisabled(), 'apply disabled while invalid');
+	await row('Ячейка 2 ур. (1-я').locator('.checkbox-container').click();
+	await sleep(300);
+	await L('rest-apply').click();
+	await sleep(600);
+	let c = (await state()).characters[id];
+	assert(c.spellSlots['3'].current === 1 && c.counters['arcane-recovery'].current === 0, 'applied once');
+	await L('gmc-undo').click();
+	await sleep(500);
+	c = (await state()).characters[id];
+	assert(c.spellSlots['3'].current === 0 && c.counters['arcane-recovery'].current === 1, 'undo restores slot and counter');
+	for (const [lv, max] of [['1', 4], ['2', 3], ['3', 2]]) await act({ type: 'character/set-slot', characterId: id, level: lv, slot: { max, current: max } });
 });
 
 await step('P3b', 'Быстрое заполнение с бумажного листа: частичные данные сохраняются', async () => {
@@ -211,11 +285,11 @@ await step('P2', 'Инвентарь: добавить кинжал, надет�
 	await L(`tr-${evidence.borin}`).click();
 	await sleep(500);
 	s = await state();
-	const items = Object.values(s.extensions.cockpit.items).filter((i) => i.typeId === 'dagger' && i.ownerKind === 'character');
+	const items = Object.values(s.extensions.cockpit.items).filter((i) => i.typeId === 'dagger' && [alexId, evidence.borin].includes(i.ownerId));
 	assert(items.length === 2 && items.some((i) => i.ownerId === evidence.borin && i.qty === 1) && items.some((i) => i.ownerId === alexId && i.qty === 1), JSON.stringify(items));
 	await L('gmc-undo').click();
 	await sleep(500);
-	const after = Object.values((await state()).extensions.cockpit.items).filter((i) => i.typeId === 'dagger' && i.ownerKind === 'character');
+	const after = Object.values((await state()).extensions.cockpit.items).filter((i) => i.typeId === 'dagger' && [alexId, evidence.borin].includes(i.ownerId));
 	assert(after.length === 1 && after[0].qty === 2 && after[0].ownerId === alexId, 'undo transfer');
 	await app.screenshot('scn-p2-inventory');
 	await L('gmc-back').click();
@@ -361,7 +435,7 @@ await step('S', 'Перейти: две группы; переход к узлу
 	await fillModal('goto-input', 'бандит');
 	await L('goto-create-npc').first().click();
 	await L('gmc-card').waitFor();
-	assert(/Бандит/.test(await L('gmc-name').innerText()), 'bandit card opened');
+	assert(/Bandit/.test(await L('gmc-name').innerText()), 'bandit card opened');
 	assert((await app.eval(() => window.app.workspace.getLeavesOfType('canvas')[0].view.canvas.nodes.size)) === nodesBefore, 'canvas untouched by search');
 	// item instance for the card owner
 	await L('gmc-goto').click();
@@ -378,13 +452,13 @@ await step('S', 'Перейти: две группы; переход к узлу
 	await sleep(1500);
 	const nodesAfter = await app.eval(() => window.app.workspace.getLeavesOfType('canvas')[0].view.canvas.nodes.size);
 	assert(nodesAfter === nodesBefore + 1, `node added ${nodesBefore}->${nodesAfter}`);
-	assert(existsSync(join(sb.vault, A, 'Elements/NPC/Бандит (бандит)'.replace(' (бандит)', '') + '.md')) || readdirSync(join(sb.vault, A, 'Elements/NPC')).some((f) => /Бандит/.test(f)), 'npc note created');
+	assert(existsSync(join(sb.vault, A, 'Elements/NPC/Bandit.md')) || readdirSync(join(sb.vault, A, 'Elements/NPC')).some((f) => /Bandit/.test(f)), 'npc note created');
 	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), alexId);
-	const p = await app.eval(() => { const c = window.app.workspace.getLeavesOfType('canvas')[0].view.canvas; for (const n of c.nodes.values()) if (/NPC\/Бандит/.test(n.file?.path ?? '')) { const r = n.nodeEl.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; } return null; });
+	const p = await app.eval(() => { const c = window.app.workspace.getLeavesOfType('canvas')[0].view.canvas; for (const n of c.nodes.values()) if (/NPC\/Bandit/.test(n.file?.path ?? '')) { const r = n.nodeEl.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; } return null; });
 	assert(p, 'new node in DOM');
 	await app.page.mouse.dblclick(p.x, p.y);
 	await sleep(600);
-	assert(/Бандит/.test(await L('gmc-name').innerText()), 'double click on the new node opens the bandit card');
+	assert(/Bandit/.test(await L('gmc-name').innerText()), 'double click on the new node opens the bandit card');
 	await app.screenshot('scn-s-goto');
 });
 
@@ -406,7 +480,7 @@ await step('A', 'Драка в таверне: партия + 6 NPC, иници�
 	assert(s.activeEncounter.round === 1 && s.activeEncounter.activeSlotId, 'round 1 started');
 	for (let k = 0; k < 4; k++) { await L('gmc-next').click(); await sleep(250); }
 	// damage a bandit through its card: independent HP
-	const bandits = cmbs.filter((c) => /Бандит/.test(c.displayName));
+	const bandits = cmbs.filter((c) => /Bandit/.test(c.displayName));
 	assert(bandits.length === 3, 'three independent bandits');
 	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'combatant', id }), bandits[1].id);
 	await L('gmc-hp-input').fill('-5');

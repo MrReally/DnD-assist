@@ -424,6 +424,7 @@ function reduce(s: AdventureState, a: Action, opts: ReducerOptions): void {
 			if (a.effect) reduce(s, { ...a, type: 'effect/add', effect: a.effect }, opts);
 			return;
 		}
+		case 'cockpit/level-up':
 		case 'cockpit/sheet-set':
 		case 'cockpit/statblock-set':
 		case 'cockpit/npc-create':

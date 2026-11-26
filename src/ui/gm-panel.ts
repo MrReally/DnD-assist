@@ -5,17 +5,18 @@ import { ItemView, MarkdownRenderer, Notice, TFile, type WorkspaceLeaf } from 'o
 import { parseRoom } from '../domain/room';
 import { sendCue, DgramTransport } from '../adapters/osc-transport';
 import { hpPercent, modText, parseHpInput, resolveCard, weaponItemsOf, type AttackRow, type CardModel } from '../domain/card';
-import { levelUp, resolveItemType } from '../domain/builder';
+import { preparedSpellCount } from '../domain/class-rules';
+import { resolveItemType } from '../domain/builder';
 import { ABILITIES, ABILITY_RU, SKILLS, carriedWeight, cockpitOf, formatCost, formatWeight, isProficientWith, itemsOf, profBonusOf, purseOf, saveBonus, signed, skillBonus, spellAttackBonus, spellDc, weaponAttack, type ItemInstance, type Purse } from '../domain/cockpit';
 import { newId } from '../domain/ids';
 import { lookupSpell } from '../domain/spell-import';
-import { armorClassLabel } from '../domain/srd-data';
+import { armorClassLabel, propertyLabel } from '../domain/srd-data';
 import type { Controller } from '../controller';
 import type { Effect } from '../domain/types';
 import { button } from './common';
 import { endEncounter, nextTurn } from './actions';
 import { AddCombatantModal } from './encounter-modals';
-import { addCreatureToCombat, AddItemModal, BuilderModal, CueModal, QuickNpcModal, SpellImportModal, TransferModal } from './cockpit/modals';
+import { addCreatureToCombat, AddItemModal, BuilderModal, CueModal, LevelUpModal, QuickNpcModal, SpellImportModal, TransferModal } from './cockpit/modals';
 import { effectsFor, renderEffectPills } from './overlay';
 import { RestModal } from './rest-modal';
 import { CheckpointModal, ViewPointsModal } from './cockpit/canvas-modals';
@@ -346,9 +347,11 @@ export class GmCockpitPanel extends ItemView {
 			kv('Урон', `${row.damage}${row.damageType ? `, ${row.damageType}` : ''}`, 'gmc-w-damage');
 			kv('Дистанция', row.range || '—');
 		}
-		if (type?.properties.length) kv('Свойства', type.properties.join(', '), 'gmc-w-props');
+		if (type?.properties.length) kv('Свойства', type.properties.map(propertyLabel).join(', '), 'gmc-w-props');
 		if (row?.notes) kv('Заметка', row.notes);
 		if (item?.magicBonus) kv('Магический бонус', signed(item.magicBonus));
+		if (type) kv('Источник', type.verification === 'srd-verified' ? 'SRD 5.1 · проверено' : type.verification ?? 'пользовательский');
+		if (type?.ru) card.createDiv({ cls: 'gmc-dim', text: `${type.name} — английское название SRD; «${type.ru}» — общепринятое русское название (не из SRD, не проверено).` });
 		const det = card.createEl('details', { cls: 'gmc-how', attr: { 'data-testid': 'gmc-how' } });
 		det.createEl('summary', { text: 'Как считается' });
 		if (type && m.abilities) {
@@ -442,7 +445,8 @@ export class GmCockpitPanel extends ItemView {
 		kv('Стоимость', t ? formatCost(t.costCp) : '—');
 		kv('Вес', t ? formatWeight(t.weight) : '—');
 		kv('Количество', String(it.qty));
-		if (t?.ac) kv('КД', armorClassLabel(t) + (t.ac.minStr ? ` · СИЛ ${t.ac.minStr}` : '') + (t.ac.stealthDis ? ' · помеха Скрытности' : ''));
+		if (t) kv('Источник', t.verification === 'srd-verified' ? 'SRD 5.1 · проверено' : t.verification ?? 'пользовательский');
+		if (t?.ac) kv('КД', armorClassLabel(t) + (t.ac.minStr ? ` · Str ${t.ac.minStr}` : '') + (t.ac.stealthDis ? ' · Stealth: disadvantage' : ''));
 		if (t?.text) card.createDiv({ text: t.text });
 	}
 
@@ -502,14 +506,7 @@ export class GmCockpitPanel extends ItemView {
 				for (const x of sh.features) f.createDiv({ text: `${x.name}: ${x.text}` });
 			}
 			const ch = st.characters[id];
-			if (ch) button(card, 'Повысить уровень', () => {
-				try {
-					const r = levelUp(ch, sh);
-					void this.ctl.act({ type: 'character/upsert', character: r.character }).then((o) => o.ok && new Notice(r.warnings.join('\n'), 9000));
-				} catch (e) {
-					new Notice(e instanceof Error ? e.message : String(e), 7000);
-				}
-			}, { icon: 'arrow-up', cls: 'gmc-btn', testId: 'gmc-levelup' });
+			if (ch) button(card, 'Повысить уровень', () => new LevelUpModal(this.ctl, id).open(), { icon: 'arrow-up', cls: 'gmc-btn', testId: 'gmc-levelup' });
 			if (ch) card.createDiv({ cls: 'gmc-dim', text: `Скорость ${ch.speedFeet ?? '—'} фт · Кости хитов ${ch.hitDice.map((h) => `${h.remaining}/${h.total}${h.die}`).join(', ') || '—'}` });
 		}
 		if (m.statblock) {
@@ -589,6 +586,9 @@ export class GmCockpitPanel extends ItemView {
 			button(c, '+', () => void this.ctl.act({ type: 'character/set-slot', characterId: ch.id, level: lv, slot: { ...s, current: Math.min(s.max, s.current + 1) } }), { cls: 'gmc-btn gmc-btn-sm gmc-btn-i', title: 'Вернуть', testId: `gmc-slot-inc-${lv}` });
 		}
 		const book = cockpitOf(st).spellbooks[ch.id] ?? { known: [], prepared: [] };
+		const classId = cockpitOf(st).sheets[ch.id]?.classId;
+		const want = classId && m.abilities ? preparedSpellCount(classId, m.level, m.abilities) : null;
+		if (want !== null) card.createDiv({ cls: ['gmc-dim', book.prepared.length > want ? 'gmc-warn' : ''].filter(Boolean).join(' '), text: `Подготовлено: ${book.prepared.length} из ${want}${book.prepared.length > want ? ' — больше допустимого' : ''}`, attr: { 'data-testid': 'gmc-prepared-count' } });
 		const list = card.createDiv({ cls: 'gmc-items' });
 		for (const sp of [...book.known].sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, 'ru'))) {
 			const r = list.createDiv({ cls: 'gmc-item', attr: { 'data-testid': `gmc-sp-${sp.id}` } });

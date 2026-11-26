@@ -82,6 +82,13 @@ export function reduceCockpit(s: AdventureState, a: Action): void {
 			c.sheets[a.characterId] = checkSheet({ ...cur, ...structuredClone(a.patch), abilities: { ...cur.abilities, ...(a.patch.abilities ?? {}) } });
 			return;
 		}
+		case 'cockpit/level-up': {
+			if (!s.characters[a.character.id]) throw new DomainError('Персонаж не найден в этом приключении');
+			int(a.character.hp.current, 'текущие хиты', 0, 100000);
+			s.characters[a.character.id] = structuredClone(a.character);
+			c.sheets[a.character.id] = checkSheet(structuredClone(a.sheet));
+			return;
+		}
 		case 'cockpit/statblock-set': {
 			if (!s.creatures[a.statblock.creatureId]) throw new DomainError('Карточка существа не найдена');
 			c.statblocks[a.statblock.creatureId] = checkStat(structuredClone(a.statblock));

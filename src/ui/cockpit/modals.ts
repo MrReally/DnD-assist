@@ -1,6 +1,6 @@
 // Cockpit dialogs: quick NPC, character builder / paper quick-fill, add item, transfer, spell import, cue binding.
 import { Modal, Notice, Setting } from 'obsidian';
-import { buildCharacter, classById, pointBuyCost, quickNpc, resolveItemType, STANDARD_ARRAY, type BuildChoices } from '../../domain/builder';
+import { abilitiesAfter, buildCharacter, classById, levelUp, pointBuyCost, quickNpc, resolveItemType, STANDARD_ARRAY, type BuildChoices } from '../../domain/builder';
 import { ABILITIES, ABILITY_RU, SKILLS, cockpitOf, formatCost, type Abilities, type ItemInstance, type ItemType } from '../../domain/cockpit';
 import { buildMonsters, pcCombatant } from '../../domain/encounter';
 import { emptyEncounter } from '../../domain/encounter';
@@ -9,7 +9,9 @@ import { newId } from '../../domain/ids';
 import { sanitizeFileName } from '../../domain/normalize';
 import { importSpell, lookupSpell, searchSpells, upsertSpell, validateCard, type SpellCard } from '../../domain/spell-import';
 import { buildCueMessage, validateBinding, type CueBinding, type CueCommand } from '../../domain/lightkey';
-import { CLASSES, ITEM_TYPES, RACES } from '../../domain/srd-data';
+import { CLASSES, ITEM_TYPES, RACES, raceTraits, spellSlotsFor, srdSubclasses } from '../../domain/srd-data';
+import { asiLevels, cantripsKnown, pactMagic, preparedSpellCount, wizardSpellbookSize } from '../../domain/class-rules';
+import { getSrd } from '../../domain/srd';
 void lookupSpell;
 import type { Controller } from '../../controller';
 import { DgramTransport, sendCue } from '../../adapters/osc-transport';
@@ -17,6 +19,7 @@ import { button } from '../common';
 import type { AbilityId } from '../../domain/types';
 
 const tid = (el: HTMLElement, id: string): void => void (el.dataset.testid = id);
+const ab = (v: string): AbilityId | undefined => ABILITIES.find((a) => a === v);
 
 function field(parent: HTMLElement, label: string, init: string, onInput: (v: string) => void, testId?: string, type = 'text'): HTMLInputElement {
 	let input!: HTMLInputElement;
@@ -111,7 +114,7 @@ export class AddItemModal extends Modal {
 		const s = this.ctl.state;
 		const custom = s ? Object.values(cockpitOf(s).itemTypes) : [];
 		const q = this.filter.trim().toLowerCase().replace(/ё/g, 'е');
-		return [...custom, ...Object.values(ITEM_TYPES)].filter((t) => !q || t.name.toLowerCase().replace(/ё/g, 'е').includes(q)).slice(0, 40);
+		return [...custom, ...Object.values(ITEM_TYPES)].filter((t) => !q || `${t.name} ${t.ru ?? ''}`.toLowerCase().replace(/ё/g, 'е').includes(q)).slice(0, 40);
 	}
 
 	private render(): void {
@@ -139,7 +142,7 @@ export class AddItemModal extends Modal {
 	private fill(list: HTMLElement): void {
 		for (const t of this.types()) {
 			const row = list.createDiv({ cls: 'gmc-pickrow', attr: { tabindex: '0', role: 'button', 'data-testid': `ai-${t.id}` } });
-			row.createSpan({ text: t.name });
+			row.createSpan({ text: t.ru ? `${t.ru} (${t.name})` : t.name });
 			row.createSpan({ cls: 'gmc-dim', text: `${formatCost(t.costCp)}${t.damage ? ` · ${t.damage}` : ''}` });
 			const pick = (): void => void this.add(t);
 			row.addEventListener('click', pick);
@@ -153,7 +156,7 @@ export class AddItemModal extends Modal {
 	}
 
 	private async add(t: ItemType): Promise<void> {
-		const item: ItemInstance = { id: newId('itm'), typeId: t.id, name: t.name, ownerKind: this.owner.kind, ownerId: this.owner.id, containerId: this.containerId, qty: this.qty, equipped: false, magicBonus: 0, note: '' };
+		const item: ItemInstance = { id: newId('itm'), typeId: t.id, name: t.ru ?? t.name, ownerKind: this.owner.kind, ownerId: this.owner.id, containerId: this.containerId, qty: this.qty, equipped: false, magicBonus: 0, note: '' };
 		if ((await this.ctl.act({ type: 'cockpit/item-upsert', item })).ok) this.close();
 	}
 
@@ -255,13 +258,39 @@ export class BuilderModal extends Modal {
 		return c === null ? 'Набор вне покупки очков (8–15): допустим, если так решил мастер' : `Покупка очков: ${c} из 27`;
 	}
 
+	private pickGroup(el: HTMLElement, title: string, items: Array<{ id: string; label: string }>, selected: string[], max: number, onChange: (v: string[]) => void, tidPrefix: string): void {
+		el.createDiv({ cls: 'gmc-eyebrow', text: `${title}: ${selected.length} из ${max}` });
+		const row = el.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap gmc-picklist' });
+		for (const it of items) {
+			const lab = row.createEl('label', { cls: 'gmc-check' });
+			const cb = lab.createEl('input', { type: 'checkbox', attr: { 'data-testid': `${tidPrefix}-${it.id}` } });
+			cb.checked = selected.includes(it.id);
+			cb.disabled = !cb.checked && selected.length >= max;
+			cb.addEventListener('change', () => {
+				onChange(cb.checked ? [...selected, it.id] : selected.filter((x) => x !== it.id));
+				this.render();
+			});
+			lab.createSpan({ text: it.label });
+		}
+	}
+
 	private renderRules(el: HTMLElement): void {
+		const c = this.c;
 		new Setting(el).setName('Раса').addDropdown((d) => {
-			for (const r of RACES) d.addOption(r.id, r.ru);
-			d.setValue(this.c.raceId).onChange((v) => ((this.c.raceId = v), (this.free = []), this.render()));
+			for (const r of RACES.filter((x) => !x.parent)) d.addOption(r.id, r.ru);
+			d.setValue(c.raceId).onChange((v) => ((c.raceId = v), delete c.subraceId, (this.free = []), (c.raceSkills = []), this.render()));
 			tid(d.selectEl, 'bd-race');
 		});
-		const race = RACES.find((r) => r.id === this.c.raceId);
+		const race = RACES.find((r) => r.id === c.raceId && !r.parent);
+		const subs = RACES.filter((r) => r.parent === c.raceId);
+		if (subs.length) {
+			new Setting(el).setName('Подраса (SRD)').addDropdown((d) => {
+				d.addOption('', 'без подрасы');
+				for (const r of subs) d.addOption(r.id, r.ru);
+				d.setValue(c.subraceId ?? '').onChange((v) => ((v ? (c.subraceId = v) : delete c.subraceId), this.render()));
+				tid(d.selectEl, 'bd-subrace');
+			});
+		}
 		if (race?.freeBonus) {
 			const fb = race.freeBonus;
 			const row = el.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap' });
@@ -277,37 +306,107 @@ export class BuilderModal extends Modal {
 				lab.createSpan({ text: ABILITY_RU[a] });
 			}
 		}
+		const traits = raceTraits(c.raceId, c.subraceId);
+		if ((traits.freeSkills ?? 0) > 0) this.pickGroup(el, 'Навыки расы (по выбору)', SKILLS.map((x) => ({ id: x.id, label: x.ru })), c.raceSkills ?? [], traits.freeSkills ?? 0, (v) => (c.raceSkills = v), 'bd-rskill');
 		new Setting(el).setName('Класс').addDropdown((d) => {
 			for (const k of CLASSES) d.addOption(k.id, k.ru);
-			d.setValue(this.c.classId).onChange((v) => ((this.c.classId = v), (this.c.skills = []), this.render()));
+			d.setValue(c.classId).onChange((v) => ((c.classId = v), (c.skills = []), (c.asi = []), (c.cantrips = []), (c.spells = []), (c.prepared = []), (c.subclass = ''), this.render()));
 			tid(d.selectEl, 'bd-class');
 		});
-		field(el, 'Уровень (1–20)', String(this.c.level), (v) => (this.c.level = Math.max(1, Math.min(20, Math.floor(Number(v)) || 1))), 'bd-level', 'number');
-		field(el, 'Предыстория', this.c.background, (v) => (this.c.background = v));
-		field(el, 'Подкласс', this.c.subclass, (v) => (this.c.subclass = v), 'bd-subclass');
+		field(el, 'Уровень (1–20)', String(c.level), (v) => {
+			c.level = Math.max(1, Math.min(20, Math.floor(Number(v)) || 1));
+			c.asi = (c.asi ?? []).slice(0, asiLevels(c.classId, c.level).length);
+		}, 'bd-level', 'number');
+		const lvlInput = el.querySelector<HTMLInputElement>('[data-testid=bd-level]');
+		lvlInput?.addEventListener('change', () => this.render());
+		new Setting(el).setName('Предыстория').setDesc('В SRD только Acolyte. Остальные (например, Criminal) — вводятся вручную: навыки берутся с бумажного листа, ничего не подставляется.').addDropdown((d) => {
+			d.addOption('custom', 'Другая (ввести вручную)');
+			d.addOption('srd', 'Acolyte (SRD: Insight, Religion)');
+			d.setValue(c.backgroundKind ?? 'custom').onChange((v) => ((c.backgroundKind = v as 'srd' | 'custom'), c.backgroundKind === 'srd' && (c.background = 'Acolyte'), this.render()));
+			tid(d.selectEl, 'bd-bgkind');
+		});
+		if ((c.backgroundKind ?? 'custom') === 'custom') {
+			field(el, 'Название предыстории', c.background, (v) => (c.background = v), 'bd-bgname');
+			this.pickGroup(el, 'Навыки предыстории (с листа)', SKILLS.map((x) => ({ id: x.id, label: x.ru })), c.backgroundSkills ?? [], 2, (v) => (c.backgroundSkills = v), 'bd-bgskill');
+		}
+		const cls = classById(c.classId);
+		if (cls && c.level >= cls.subclassLevel) {
+			const subs = srdSubclasses(cls.id);
+			new Setting(el).setName('Подкласс').addDropdown((d) => {
+				d.addOption('', '— выберите —');
+				for (const x of subs) d.addOption(x.name, `${x.name} (SRD)`);
+				d.addOption('__custom', 'Другой (ввести вручную)');
+				d.setValue(subs.some((x) => x.name === c.subclass) ? c.subclass : c.subclass ? '__custom' : '').onChange((v) => ((c.subclass = v === '__custom' ? ' ' : v), this.render()));
+				tid(d.selectEl, 'bd-subclass-select');
+			});
+			if (c.subclass && !subs.some((x) => x.name === c.subclass)) field(el, 'Название подкласса', c.subclass.trim(), (v) => (c.subclass = v || ' '), 'bd-subclass');
+		}
 		this.abilityInputs(el, 'Значения до расовых бонусов; бонусы расы добавляются при создании.');
-		const cls = classById(this.c.classId);
+		const asiAt = asiLevels(c.classId, c.level);
+		c.asi = c.asi ?? [];
+		asiAt.forEach((lv, i) => {
+			const cur = c.asi?.[i];
+			new Setting(el).setName(`Уровень ${lv}: повышение характеристик`).addDropdown((d) => {
+				d.addOption('', '— выберите —');
+				for (const a of ABILITIES) d.addOption(`+2:${a}`, `+2 ${ABILITY_RU[a]}`);
+				d.addOption('grappler', 'Черта Grappler (SRD)');
+				d.setValue(cur === 'grappler' ? 'grappler' : cur?.length === 1 ? `+2:${cur[0]}` : '').onChange((v) => {
+					const arr = [...(c.asi ?? [])];
+					if (!v) arr.splice(i, 1);
+					else {
+						const a = ab(v.slice(3));
+						if (v === 'grappler') arr[i] = 'grappler';
+						else if (a) arr[i] = [a];
+					}
+					c.asi = arr;
+					this.render();
+				});
+				tid(d.selectEl, `bd-asi-${i}`);
+			}).addDropdown((d) => {
+				d.addOption('', '+1 / +1: вторая…');
+				for (const a of ABILITIES) d.addOption(a, `+1 ${ABILITY_RU[a]}`);
+				d.setValue(Array.isArray(cur) && cur.length === 2 ? (cur[1] as string) : '').onChange((v) => {
+					const first = Array.isArray(cur) ? cur[0] : undefined;
+					const second = ab(v);
+					if (second && first) (c.asi ?? [])[i] = [first, second];
+					this.render();
+				});
+			});
+		});
 		if (cls) {
-			el.createDiv({ cls: 'gmc-eyebrow', text: `Навыки: выберите ${cls.skillChoices}` });
-			const row = el.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap' });
-			for (const sk of SKILLS.filter((x) => cls.skillList === 'any' || cls.skillList.includes(x.id))) {
-				const lab = row.createEl('label', { cls: 'gmc-check' });
-				const cb = lab.createEl('input', { type: 'checkbox', attr: { 'data-testid': `bd-skill-${sk.id}` } });
-				cb.checked = this.c.skills.includes(sk.id);
-				cb.addEventListener('change', () => (this.c.skills = cb.checked ? [...this.c.skills, sk.id] : this.c.skills.filter((x) => x !== sk.id)));
-				lab.createSpan({ text: sk.ru });
-			}
+			this.pickGroup(el, 'Навыки класса', SKILLS.filter((x) => cls.skillList === 'any' || cls.skillList.includes(x.id)).map((x) => ({ id: x.id, label: x.ru })), c.skills, cls.skillChoices, (v) => (c.skills = v), 'bd-skill');
+			this.renderSpellPicks(el, cls);
 		}
 		el.createDiv({ cls: 'gmc-eyebrow', text: 'Снаряжение' });
 		const gear = el.createDiv({ cls: 'gmc-row gmc-gap gmc-wrap' });
-		for (const id of ['longsword', 'dagger', 'shortbow', 'quarterstaff', 'leather', 'chain-mail', 'shield', 'backpack', 'rope-hempen-50-feet']) {
+		for (const id of ['longsword', 'dagger', 'shortbow', 'quarterstaff', 'leather', 'chain-mail', 'shield', 'backpack', 'rope-hempen-50-feet', 'spellbook', 'component-pouch']) {
 			const t = ITEM_TYPES[id];
 			if (!t) continue;
 			const lab = gear.createEl('label', { cls: 'gmc-check' });
 			const cb = lab.createEl('input', { type: 'checkbox', attr: { 'data-testid': `bd-gear-${id}` } });
-			cb.checked = this.c.gear.includes(id);
-			cb.addEventListener('change', () => (this.c.gear = cb.checked ? [...this.c.gear, id] : this.c.gear.filter((x) => x !== id)));
-			lab.createSpan({ text: t.name });
+			cb.checked = c.gear.includes(id);
+			cb.addEventListener('change', () => (c.gear = cb.checked ? [...c.gear, id] : c.gear.filter((x) => x !== id)));
+			lab.createSpan({ text: t.ru ?? t.name });
+		}
+	}
+
+	private renderSpellPicks(el: HTMLElement, cls: NonNullable<ReturnType<typeof classById>>): void {
+		const c = this.c;
+		const srd = getSrd();
+		if (!srd || (cls.caster === 'none' && cls.id !== 'warlock')) return;
+		const slots = spellSlotsFor(cls.caster, c.level);
+		const maxSpellLevel = cls.id === 'warlock' ? (pactMagic(c.level)?.slotLevel ?? 1) : Math.max(0, ...Object.keys(slots).map(Number));
+		const list = srd.spells.filter((x) => x.classes.includes(cls.id));
+		const traits = raceTraits(c.raceId, c.subraceId);
+		const cantripN = (cantripsKnown(cls.id, c.level) ?? 0) + (cls.id === 'wizard' ? (traits.wizardCantrips ?? 0) : 0);
+		if (cantripN > 0) this.pickGroup(el, 'Заговоры', list.filter((x) => x.level === 0).map((x) => ({ id: x.id, label: x.name })), c.cantrips ?? [], cantripN, (v) => (c.cantrips = v), 'bd-cantrip');
+		if (cls.id === 'wizard') {
+			this.pickGroup(el, 'Книга заклинаний', list.filter((x) => x.level >= 1 && x.level <= maxSpellLevel).map((x) => ({ id: x.id, label: `${x.name} (${x.level})` })), c.spells ?? [], wizardSpellbookSize(c.level), (v) => ((c.spells = v), (c.prepared = (c.prepared ?? []).filter((p) => v.includes(p)))), 'bd-spell');
+		}
+		const prepN = preparedSpellCount(cls.id, c.level, abilitiesAfter({ ...c, freeBonusPicks: this.free }).abilities);
+		if (prepN !== null) {
+			const pool = cls.id === 'wizard' ? (c.spells ?? []) : list.filter((x) => x.level >= 1 && x.level <= maxSpellLevel).map((x) => x.id);
+			this.pickGroup(el, 'Подготовленные (число зависит от итоговых характеристик — сверьте)', pool.map((id) => ({ id, label: srd.spells.find((x) => x.id === id)?.name ?? id })), c.prepared ?? [], prepN, (v) => (c.prepared = v), 'bd-prep');
 		}
 	}
 
@@ -332,7 +431,7 @@ export class BuilderModal extends Modal {
 		let r;
 		if (this.mode === 'rules') {
 			try {
-				r = buildCharacter({ ...this.c, notePath, freeBonusPicks: this.free }, newId);
+				r = buildCharacter({ ...this.c, subclass: this.c.subclass.trim(), notePath, freeBonusPicks: this.free }, newId);
 			} catch (e) {
 				return void err.setText(e instanceof Error ? e.message : String(e));
 			}
@@ -527,3 +626,71 @@ export class CueModal extends Modal {
 }
 
 export type { Abilities };
+
+/** Level up with the player's decisions: Ability Score Improvement (or the SRD feat) and subclass. One undoable action. */
+export class LevelUpModal extends Modal {
+	private asi: AbilityId[] | 'grappler' | null = null;
+	private second: AbilityId | '' = '';
+	private subclass = '';
+	constructor(private readonly ctl: Controller, private readonly characterId: string) {
+		super(ctl.app);
+	}
+
+	override onOpen(): void {
+		this.titleEl.setText('Повышение уровня');
+		const st = this.ctl.state;
+		const ch = st?.characters[this.characterId];
+		const sheet = st ? cockpitOf(st).sheets[this.characterId] : undefined;
+		const el = this.contentEl;
+		if (!ch || !sheet) return void el.createDiv({ cls: 'gmc-warn', text: 'Нет листа персонажа: правьте уровень вручную по бумажному листу.' });
+		const idx = ch.classes.findIndex((k) => CLASSES.some((c) => c.ru === k.name));
+		const entry = ch.classes[idx];
+		const def = entry ? CLASSES.find((c) => c.ru === entry.name) : undefined;
+		if (!entry || !def) return void el.createDiv({ cls: 'gmc-warn', text: 'Класс не из SRD — повысьте уровень вручную по бумажному листу.' });
+		const next = entry.level + 1;
+		el.createDiv({ text: `${entry.name}: ${entry.level} → ${next}` });
+		const hasAsi = asiLevels(def.id, next).includes(next);
+		if (hasAsi) {
+			el.createDiv({ cls: 'gmc-eyebrow', text: 'Повышение характеристик (выбор игрока)' });
+			new Setting(el).setName('+2 к одной').addDropdown((d) => {
+				d.addOption('', '—');
+				for (const a of ABILITIES) d.addOption(a, ABILITY_RU[a]);
+				d.onChange((v) => {
+					const a = ab(v);
+					this.asi = a ? [a] : null;
+					this.second = '';
+				});
+				tid(d.selectEl, 'lu-asi');
+			});
+			new Setting(el).setName('или +1 ко второй (к выбранной выше)').addDropdown((d) => {
+				d.addOption('', '—');
+				for (const a of ABILITIES) d.addOption(a, ABILITY_RU[a]);
+				d.onChange((v) => (this.second = ab(v) ?? ''));
+				tid(d.selectEl, 'lu-asi2');
+			});
+			new Setting(el).setName('или черта SRD').addToggle((t) => t.onChange((v) => (this.asi = v ? 'grappler' : null)));
+		}
+		if (next === def.subclassLevel && !sheet.subclass.trim()) {
+			new Setting(el).setName('Подкласс').addDropdown((d) => {
+				d.addOption('', '— выберите —');
+				for (const x of srdSubclasses(def.id)) d.addOption(x.name, `${x.name} (SRD)`);
+				d.onChange((v) => (this.subclass = v));
+				tid(d.selectEl, 'lu-subclass');
+			});
+		}
+		const err = el.createDiv({ cls: 'gmc-warn' });
+		button(el, 'Повысить', () => void (async () => {
+			try {
+				const first = Array.isArray(this.asi) ? this.asi[0] : undefined;
+				const pick: AbilityId[] | 'grappler' | null = this.asi === 'grappler' ? 'grappler' : first && this.second ? [first, this.second] : this.asi;
+				const r = levelUp(ch, { ...sheet, ...(this.subclass ? { subclass: this.subclass } : {}) }, hasAsi && pick ? { asi: pick } : {});
+				const out = await this.ctl.act({ type: 'cockpit/level-up', character: r.character, sheet: r.sheet });
+				if (!out.ok) return;
+				new Notice(r.warnings.join('\n'), 9000);
+				this.close();
+			} catch (e) {
+				err.setText(e instanceof Error ? e.message : String(e));
+			}
+		})(), { cls: 'gmc-btn gmc-btn-p', testId: 'lu-apply' });
+	}
+}

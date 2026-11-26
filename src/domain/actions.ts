@@ -80,6 +80,7 @@ export type ActionPayload =
 	| { type: 'cockpit/statblock-set'; statblock: StatBlock }
 	| { type: 'cockpit/npc-create'; creature: CreatureCard; statblock: StatBlock; items: ItemInstance[]; purse?: Purse }
 	| { type: 'cockpit/character-build'; character: CharacterState; sheet: Sheet; items: ItemInstance[]; purse?: Purse; book?: Spellbook; partyId?: string | null }
+	| { type: 'cockpit/level-up'; character: CharacterState; sheet: Sheet }
 	| { type: 'cockpit/item-upsert'; item: ItemInstance }
 	| { type: 'cockpit/item-remove'; itemId: string }
 	| { type: 'cockpit/item-transfer'; itemId: string; ownerKind: 'character' | 'creature'; ownerId: string; qty?: number; newId?: string }
@@ -146,6 +147,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 	'cockpit/statblock-set': 'Статблок',
 	'cockpit/npc-create': 'Быстрый NPC',
 	'cockpit/character-build': 'Новый персонаж',
+	'cockpit/level-up': 'Повышение уровня',
 	'cockpit/item-upsert': 'Предмет',
 	'cockpit/item-remove': 'Удаление предмета',
 	'cockpit/item-transfer': 'Передача предмета',

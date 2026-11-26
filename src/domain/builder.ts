@@ -80,17 +80,14 @@ export function armorClassFor(abilities: Abilities, equipped: ItemType[]): numbe
 	return ac;
 }
 
-export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): BuildResult {
-	const warnings: string[] = [];
-	const cls = classById(ch.classId);
+/** Ability scores after racial bonuses, free picks and Ability Score Improvements. Optional sink collects rule warnings. */
+export function abilitiesAfter(ch: BuildChoices, warnings: string[] = []): { abilities: Abilities; features: Array<{ name: string; text: string }> } {
 	const race = RACES.find((r) => r.id === ch.raceId && !r.parent);
 	const sub = ch.subraceId ? RACES.find((r) => r.id === ch.subraceId && r.parent === ch.raceId) : undefined;
-	if (ch.subraceId && !sub) throw new Error('Подраса не соответствует расе');
-	if (!cls) throw new Error('Неизвестный класс');
-	if (!race) throw new Error('Неизвестная раса');
 	const level = Math.max(1, Math.min(20, Math.floor(ch.level)));
-	const traits = raceTraits(ch.raceId, ch.subraceId);
+	const cls = classById(ch.classId);
 	const abilities: Abilities = { ...ch.baseAbilities };
+	if (!race || !cls) return { abilities, features: [] };
 	for (const [k, v] of Object.entries(race.bonus)) abilities[k as AbilityId] += v ?? 0;
 	for (const [k, v] of Object.entries(sub?.bonus ?? {})) abilities[k as AbilityId] += v ?? 0;
 	if (race.freeBonus) {
@@ -116,6 +113,20 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 			abilities[a] = Math.min(20, abilities[a] + inc);
 		}
 	}
+	return { abilities, features };
+}
+
+export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): BuildResult {
+	const warnings: string[] = [];
+	const cls = classById(ch.classId);
+	const race = RACES.find((r) => r.id === ch.raceId && !r.parent);
+	const sub = ch.subraceId ? RACES.find((r) => r.id === ch.subraceId && r.parent === ch.raceId) : undefined;
+	if (ch.subraceId && !sub) throw new Error('Подраса не соответствует расе');
+	if (!cls) throw new Error('Неизвестный класс');
+	if (!race) throw new Error('Неизвестная раса');
+	const level = Math.max(1, Math.min(20, Math.floor(ch.level)));
+	const traits = raceTraits(ch.raceId, ch.subraceId);
+	const { abilities, features } = abilitiesAfter(ch, warnings);
 	const conMod = abilityMod(abilities.con);
 	const avg = Math.floor(cls.hitDie / 2) + 1;
 	const hp = ch.hpOverride ?? Math.max(1, cls.hitDie + conMod + (level - 1) * Math.max(1, avg + conMod)) + (traits.hpPerLevel ?? 0) * level;
@@ -177,7 +188,7 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 		const t = types[id];
 		if (!t) continue;
 		const equipped = t.kind === 'weapon' || t.kind === 'armor' || t.kind === 'shield';
-		items.push({ id: newId('itm'), typeId: id, name: t.name, ownerKind: 'character', ownerId: character.id, containerId: null, qty: 1, equipped, magicBonus: 0, note: '' });
+		items.push({ id: newId('itm'), typeId: id, name: t.ru ?? t.name, ownerKind: 'character', ownerId: character.id, containerId: null, qty: 1, equipped, magicBonus: 0, note: '' });
 	}
 	character.ac = armorClassFor(abilities, items.filter((i) => i.equipped).map((i) => types[i.typeId ?? '']).filter((t): t is ItemType => !!t));
 	warnings.push('Проверьте результат по бумажному листу: он остаётся источником истины.');
@@ -254,7 +265,7 @@ function rollDice(expr: string, rng: () => number): number {
  * Nothing is scaled to party level. `weaponId` swaps the main melee attack for an SRD weapon (origin 'adapted'),
  * the only place where bonus/damage are computed (ability mod + the creature's proficiency) instead of copied.
  */
-export function creatureFromMonster(m: SrdMonster, newId: IdFactory, rng: () => number = Math.random, opts: { role?: string; weaponId?: string | null; goldMax?: number } = {}, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): QuickNpcResult {
+export function creatureFromMonster(m: SrdMonster, newId: IdFactory, rng: () => number = Math.random, opts: { role?: string; weaponId?: string | null; goldMax?: number; aliases?: string[] } = {}, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): QuickNpcResult {
 	const creatureId = newId('crt');
 	const hp = m.hpDice ? rollDice(m.hpDice, rng) : m.hpAvg;
 	const block: StatBlock = { ...structuredClone(statBlockFromMonster(m)), creatureId, role: opts.role ?? '', kind: m.xp <= 1100 && /humanoid/i.test(m.typeLine) ? 'npc' : 'monster' };
@@ -275,7 +286,7 @@ export function creatureFromMonster(m: SrdMonster, newId: IdFactory, rng: () => 
 	}
 	if (opts.role) block.origin = block.origin === 'official' ? 'adapted' : block.origin;
 	const gold = Math.floor(rng() * ((opts.goldMax ?? 0) + 1));
-	const creature: CreatureCard = { id: creatureId, name: opts.role ? `${m.name} (${opts.role})` : m.name, aliases: [m.name], ac: m.acValue, hpMax: hp, initiativeModifier: abilityMod(block.abilities.dex), speed: block.speed, notes: block.sourceNote, source: { provider: 'local', ref: m.id } };
+	const creature: CreatureCard = { id: creatureId, name: opts.role ? `${m.name} (${opts.role})` : m.name, aliases: [m.name, ...(opts.aliases ?? [])], ac: m.acValue, hpMax: hp, initiativeModifier: abilityMod(block.abilities.dex), speed: block.speed, notes: block.sourceNote, source: { provider: 'local', ref: m.id } };
 	return { creature, statblock: block, items, purse: { pp: 0, gp: gold, ep: 0, sp: gold ? Math.floor(rng() * 10) : 0, cp: 0 }, note: `HP ${hp} (${m.hpDice ?? m.hpAvg}), КД ${m.ac}` };
 }
 
@@ -284,7 +295,7 @@ export function quickNpc(query: string, newId: IdFactory, rng: () => number = Ma
 	const tpl = findTemplate(query);
 	const m = tpl ? monsterOf(tpl) : undefined;
 	if (!tpl || !m) return null;
-	return creatureFromMonster(m, newId, rng, { role: extractRole(query, tpl), weaponId: findWeapon(query), goldMax: tpl.goldMax }, types);
+	return creatureFromMonster(m, newId, rng, { role: extractRole(query, tpl), weaponId: findWeapon(query), goldMax: tpl.goldMax, aliases: tpl.keys }, types);
 }
 
 function extractRole(query: string, tpl: CreatureTemplate): string {
@@ -313,6 +324,7 @@ export function resolveItemType(state: AdventureState, item: ItemInstance): Item
 
 export interface LevelUpResult {
 	character: CharacterState;
+	sheet: Sheet;
 	warnings: string[];
 }
 
@@ -321,7 +333,8 @@ export interface LevelUpResult {
  * HP: average of the hit die (die/2+1) + CON modifier, never less than 1. Slots follow the PHB table;
  * current slots keep their spent amount. Subclass is only a reminder. Anything else stays as the GM entered it.
  */
-export function levelUp(ch: CharacterState, sheet: Sheet): LevelUpResult {
+export function levelUp(ch: CharacterState, sheetIn: Sheet, opts: { asi?: AbilityId[] | 'grappler' } = {}): LevelUpResult {
+	const sheet = structuredClone(sheetIn);
 	const warnings: string[] = [];
 	const idx = ch.classes.findIndex((k) => CLASSES.some((c) => c.ru === k.name));
 	const entry = ch.classes[idx];
@@ -331,6 +344,16 @@ export function levelUp(ch: CharacterState, sheet: Sheet): LevelUpResult {
 	const next = structuredClone(ch);
 	const lv = entry.level + 1;
 	(next.classes[idx] as { level: number }).level = lv;
+	const asiNow = asiLevels(def.id, lv).includes(lv);
+	if (asiNow && opts.asi) {
+		if (opts.asi === 'grappler') {
+			if (sheet.abilities.str < 13) warnings.push('Grappler требует Силу 13 — проверьте');
+			sheet.features = [...sheet.features, { name: 'Grappler', text: 'Черта SRD 5.1 (см. справочник).' }];
+		} else {
+			const inc = opts.asi.length === 1 ? 2 : 1;
+			for (const a of opts.asi.slice(0, 2)) sheet.abilities[a] = Math.min(20, sheet.abilities[a] + inc);
+		}
+	} else if (asiNow) warnings.push('Повышение характеристик не выбрано — внесите вручную');
 	const gain = Math.max(1, Math.floor(def.hitDie / 2) + 1 + abilityMod(sheet.abilities.con)) + raceTraits(sheet.raceId ?? '', sheet.subraceId).hpPerLevel!;
 	if (next.hp.max !== null) {
 		next.hp = { ...next.hp, max: next.hp.max + gain, current: next.hp.current + gain };
@@ -354,9 +377,8 @@ export function levelUp(ch: CharacterState, sheet: Sheet): LevelUpResult {
 	}
 	next.counters = countersFor(next, (name) => CLASSES.find((c) => c.ru === name)?.id, sheet.abilities);
 	if (lv === def.subclassLevel && !sheet.subclass.trim()) warnings.push('Выберите подкласс');
-	if ([4, 8, 12, 16, 19].includes(lv)) warnings.push('Повышение характеристик или черта — внесите вручную');
 	warnings.push(`Мастерство теперь +${profByLevel(totalLevelOf(next))}. Сверьте с бумажным листом.`);
-	return { character: next, warnings };
+	return { character: next, sheet, warnings };
 }
 
 function totalLevelOf(ch: CharacterState): number {
