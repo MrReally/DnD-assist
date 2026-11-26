@@ -1,4 +1,5 @@
 import { PluginSettingTab, Setting, type App, type Plugin } from 'obsidian';
+import { getSrd } from '../domain/srd';
 import { statblocksStatus } from '../adapters/statblock-adapter';
 import type { Controller } from '../controller';
 import { findConflicts } from '../services/hotkeys';
@@ -67,6 +68,10 @@ export class CanvasAssistSettingTab extends PluginSettingTab {
 				st.cockpitDoubleClick = v;
 				await this.save();
 			}));
+		new Setting(el).setName('Справочник SRD 5.1').setHeading();
+		const srdMeta = getSrd()?.meta;
+		el.createDiv({ cls: 'ca-muted', text: srdMeta ? `Загружено: ${srdMeta.counts.spells ?? 0} заклинаний, ${srdMeta.counts.monsters ?? 0} существ, ${srdMeta.counts.weapons ?? 0} видов оружия, ${srdMeta.counts.gear ?? 0} предметов снаряжения. Редакция 2014. Лицензия ${srdMeta.license}.` : 'Файл srd51.json не загружен: встроенный справочник недоступен (пользовательские данные работают).' });
+		if (srdMeta) el.createDiv({ cls: 'ca-muted', text: srdMeta.attribution });
 		new Setting(el).setName('Lightkey (OSC)').setHeading();
 		el.createDiv({ cls: 'ca-muted', text: 'Адрес cue берётся в Lightkey: cue → External Control → Copy OSC Address. Успешная отправка не означает, что свет изменился.' });
 		new Setting(el).setName('Хост').addText((t) => t.setValue(st.lightkey.host).onChange(async (v) => {

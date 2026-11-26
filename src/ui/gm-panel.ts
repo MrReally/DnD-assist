@@ -657,6 +657,7 @@ export class GmCockpitPanel extends ItemView {
 		const cue = this.ctl.settings.cues.find((c) => c.cardId === id);
 		button(row, 'Использовать', () => void this.cast(m, { id, name, level, concentration: conc }, level === 0 ? 0 : this.slotChoice), { cls: 'gmc-btn gmc-btn-p', testId: 'gmc-cast' });
 		button(row, 'Свет ▶', () => void this.fireCue(id), { cls: 'gmc-btn gmc-btn-a', disabled: !cue, title: cue ? 'Отправить OSC-команду' : 'Cue не привязан', testId: 'gmc-light' });
+		button(row, 'Свет ■', () => void this.fireCue(id, 'deactivate'), { cls: 'gmc-btn gmc-btn-a', disabled: !cue, title: 'Команда deactivate (поддержка в вашей версии Lightkey не подтверждена)', testId: 'gmc-light-off' });
 		button(row, cue ? 'Cue…' : 'Привязать cue', () => new CueModal(this.ctl, { id, name }, () => { this.lastKey = ''; this.render(); }).open(), { cls: 'gmc-btn gmc-btn-g', testId: 'gmc-cue' });
 		card.createDiv({ cls: 'gmc-dim gmc-lightres', attr: { 'data-testid': 'gmc-light-res' } });
 	}
@@ -675,9 +676,10 @@ export class GmCockpitPanel extends ItemView {
 		this.slotChoice = 0;
 	}
 
-	private async fireCue(spellId: string): Promise<void> {
-		const cue = this.ctl.settings.cues.find((c) => c.cardId === spellId);
-		if (!cue) return;
+	private async fireCue(spellId: string, command?: 'deactivate'): Promise<void> {
+		const found = this.ctl.settings.cues.find((c) => c.cardId === spellId);
+		if (!found) return;
+		const cue = command && found.command !== 'custom' ? { ...found, command } : found;
 		const lk = this.ctl.settings.lightkey;
 		const r = await sendCue(new DgramTransport(), { host: lk.host, port: lk.port }, cue);
 		const el = this.contentEl.querySelector('.gmc-lightres');

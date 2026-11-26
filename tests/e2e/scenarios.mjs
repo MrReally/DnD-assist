@@ -655,6 +655,78 @@ await step('K', 'Клавиатура (Tab/Enter), утечки обработч
 	return { listeners: after.l, heapDeltaMiB: Math.round((after.h - before.h) / 1048576 * 10) / 10, idleLoadPct: Math.round(idle * 1000) / 10 };
 });
 
+// ---------------------------------------------------------------- L: light failure never double-spends resources
+await step('L', 'Свет: сбой отправки не меняет ресурсы; расход ячейки ровно один; кнопка «выкл» шлёт deactivate; без cue — кнопки неактивны', async () => {
+	const id = alexId;
+	await closeModals();
+	await app.eval((id) => window.canvasAssist.ctl.setTarget({ kind: 'character', id }), id);
+	while (await L('gmc-back').count()) { await L('gmc-back').first().click(); await sleep(100); }
+	await L('gmc-spells').click();
+	const bless = await app.eval(() => window.canvasAssist.ctl.settings.spells.find((s) => s.name === 'Благословение').id);
+	await L(`gmc-sp-${bless}`).locator('.gmc-item-name').click();
+	await act({ type: 'character/set-slot', characterId: id, level: '1', slot: { max: 2, current: 2 } });
+	const before = (await state()).characters[id].spellSlots['1'].current;
+	// autostart on, invalid port → light fails, the cast is still applied exactly once
+	await app.eval(() => { const c = window.canvasAssist.ctl.settings; c.cues[0].autoStart = true; c.lightkey.port = 70000; });
+	await L('gmc-cast').click();
+	await sleep(700);
+	const after = (await state()).characters[id].spellSlots['1'].current;
+	assert(after === before - 1, `slot ${before} -> ${after}`);
+	assert(/Ошибка света/.test(await L('gmc-light-res').innerText()), 'failure is reported');
+	await sleep(500);
+	assert((await state()).characters[id].spellSlots['1'].current === after, 'no second spend after the failure');
+	// working receiver: the off button sends deactivate
+	const server = createSocket('udp4');
+	const pkts = [];
+	server.on('message', (m) => pkts.push(m.toString()));
+	await new Promise((r) => server.bind(0, '127.0.0.1', r));
+	await app.eval((p) => { const c = window.canvasAssist.ctl.settings; c.cues[0].autoStart = false; c.cues[0].command = 'activate'; c.lightkey.port = p; }, server.address().port);
+	await L('gmc-light-off').click();
+	await sleep(500);
+	server.close();
+	assert(pkts.length === 1 && pkts[0].includes('/deactivate'), `packets ${JSON.stringify(pkts)}`);
+	await L('gmc-undo').click(); await sleep(300);
+	await act({ type: 'character/set-slot', characterId: id, level: '1', slot: { max: 2, current: 2 } });
+	await L('gmc-back').click();
+});
+
+// ---------------------------------------------------------------- X: Canvas internals missing
+await step('X', 'Несовместимый Canvas (внутренний API недоступен): отключаются только затронутые функции, плагин и данные целы', async () => {
+	await openCanvas('Таверна.canvas');
+	await app.eval(() => window.canvasAssist.ctl.setCard(null));
+	const r = await app.eval(() => {
+		const c = window.app.workspace.getLeavesOfType('canvas')[0].view.canvas;
+		window.__saved = { setViewport: c.setViewport, createFileNode: c.createFileNode, nodes: c.nodes, selection: c.selection };
+		c.setViewport = undefined; c.createFileNode = undefined;
+		return true;
+	});
+	assert(r, 'api removed');
+	// view points: the dialog explains and does not throw
+	await L('gmc-viewpoints').click();
+	assert((await app.page.locator('.modal-container').innerText()).includes('Камера Canvas недоступна'), 'view points disabled with an explanation');
+	assert(await L('vp-save-1').isDisabled(), 'save disabled');
+	await closeModals();
+	// explicit "add to Canvas" falls back to opening the note
+	const nodes0 = await app.eval(() => window.app.workspace.getLeavesOfType('canvas')[0].view.canvas.nodes.size);
+	await L('gmc-goto').click();
+	await fillModal('goto-input', 'бандит');
+	await L('goto-add').first().click();
+	await sleep(800);
+	assert((await app.eval(() => window.app.workspace.getLeavesOfType('canvas')[0].view.canvas.nodes.size)) === nodes0, 'canvas untouched when the API is missing');
+	await openCanvas('Таверна.canvas');
+	// selection API gone: double click is not intercepted (native behaviour) and nothing throws
+	const p = await app.page.locator('.canvas-node').first().boundingBox();
+	await app.eval(() => { const c = window.app.workspace.getLeavesOfType('canvas')[0].view.canvas; window.__sel = c.selection; Object.defineProperty(c, 'selection', { configurable: true, get() { throw new Error('selection API removed'); } }); });
+	await app.page.mouse.click(p.x + p.width / 2, p.y + p.height / 2);
+	await sleep(400);
+	await app.eval(() => { const c = window.app.workspace.getLeavesOfType('canvas')[0].view.canvas; const s = window.__saved; delete c.selection; Object.defineProperty(c, 'selection', { configurable: true, writable: true, value: window.__sel }); c.setViewport = s.setViewport; c.createFileNode = s.createFileNode; });
+	assert(app.pluginErrors().length === 0, `plugin errors ${app.pluginErrors()}`);
+	await closeModals();
+	await app.eval(() => { const c = window.app.workspace.getLeavesOfType('canvas')[0].view.canvas; c.deselectAll?.(); for (const n of c.nodes.values()) if (n.isEditing) n.setIsEditing?.(false); });
+	await app.page.keyboard.press('Escape');
+	await app.eval(() => { for (const l of window.app.workspace.getLeavesOfType('canvas').slice(1)) l.detach(); for (const l of window.app.workspace.getLeavesOfType('markdown')) l.detach(); });
+});
+
 // ---------------------------------------------------------------- G: crash recovery
 await step('G', 'Аварийное закрытие (SIGKILL): HP, ячейки, инвентарь, настройки света и библиотека заклинаний восстановлены', async () => {
 	await app.eval(() => window.canvasAssist.ctl.setTarget(null));

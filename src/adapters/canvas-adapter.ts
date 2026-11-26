@@ -173,6 +173,7 @@ export interface Viewport {
 
 export function getViewport(view: View | null): Viewport | null {
 	const c = liveCanvas(view);
+	if (typeof c?.setViewport !== 'function') return null; // camera control unavailable → view points are disabled as a whole
 	if (!c || typeof c.tx !== 'number' || typeof c.ty !== 'number' || typeof c.tZoom !== 'number') return null;
 	return { x: c.tx, y: c.ty, zoom: c.tZoom };
 }
