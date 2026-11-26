@@ -3,12 +3,14 @@
 // Nothing is added to the Canvas automatically; the second action is always explicit.
 import { Modal, Notice, TFile } from 'obsidian';
 import { addFileNode, focusNode } from '../../adapters/canvas-adapter';
-import { findTemplate, quickNpc } from '../../domain/builder';
+import { creatureFromMonster } from '../../domain/builder';
+import { findMonsters, monsterById } from '../../domain/srd';
+import { searchSpells } from '../../domain/spell-import';
 import { cockpitOf, formatCost, type ItemType } from '../../domain/cockpit';
 import { creatureForNote } from '../../domain/card';
 import { newId } from '../../domain/ids';
 import { relativeTo, sanitizeFileName, normalizeText } from '../../domain/normalize';
-import { CREATURE_TEMPLATES, ITEM_TYPES } from '../../domain/srd-data';
+import { CREATURE_TEMPLATES, ITEM_TYPES, monsterOf } from '../../domain/srd-data';
 import type { Controller } from '../../controller';
 import { button } from '../common';
 import { addCreatureToCombat } from './modals';
@@ -73,13 +75,14 @@ export class GoToModal extends Modal {
 			ref.push({ title: cr.name, sub: 'Существо', actions: [{ label: 'В панель', testId: 'goto-panel', run: () => this.ctl.setCard({ kind: 'creature', id: cr.id }) }, { label: 'В бой', testId: 'goto-combat', run: () => void addCreatureToCombat(this.ctl, cr.id) }, { label: 'На Canvas', testId: 'goto-add', run: () => this.addCreature(cr.id) }] });
 		}
 		if (q) {
-			for (const t of CREATURE_TEMPLATES) {
-				if (!t.keys.some((k) => norm(k).includes(q)) && !has(t.name)) continue;
-				ref.push({ title: `${t.name} (SRD)`, sub: `ОП ${t.block.cr} · КД ${t.ac} · HP ${t.hpAvg}`, actions: [{ label: 'Создать NPC', testId: 'goto-create-npc', run: () => this.createNpc(t.name, false) }, { label: 'Создать и в бой', testId: 'goto-create-combat', run: () => this.createNpc(t.name, true) }] });
+			const seen = new Set<string>();
+			const mons = [...CREATURE_TEMPLATES.filter((t) => t.keys.some((k) => norm(k).includes(q))).map((t) => monsterOf(t)), ...findMonsters(this.q, 10)].filter((m): m is NonNullable<typeof m> => !!m && !seen.has(m.id) && !!seen.add(m.id));
+			for (const m of mons.slice(0, 10)) {
+				ref.push({ title: `${m.name} (SRD)`, sub: `ОП ${m.cr} · КД ${m.acValue} · HP ${m.hpAvg}`, actions: [{ label: 'Создать NPC', testId: 'goto-create-npc', run: () => this.createMonster(m.id, false) }, { label: 'Создать и в бой', testId: 'goto-create-combat', run: () => this.createMonster(m.id, true) }] });
 			}
-			for (const sp of this.ctl.settings.spells.filter((s) => has(s.name)).slice(0, 8)) {
+			for (const sp of searchSpells(this.ctl.settings.spells, this.q, 8)) {
 				const tid = this.ctl.target?.kind === 'character' ? this.ctl.target.id : null;
-				ref.push({ title: sp.name, sub: `Заклинание · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}`, actions: [{ label: 'Добавить персонажу', testId: 'goto-spell', run: () => new SpellImportModal(this.ctl, tid, () => undefined).open() }] });
+				ref.push({ title: sp.name, sub: `Заклинание · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}${sp.origin === 'srd' ? ' · SRD' : ''}`, actions: [{ label: 'Добавить персонажу', testId: 'goto-spell', run: () => new SpellImportModal(this.ctl, tid, () => undefined).open() }] });
 			}
 			const owner = this.ownerOfTarget();
 			const types: ItemType[] = [...Object.values(cockpitOf(st).itemTypes), ...Object.values(ITEM_TYPES)].filter((t) => has(t.name)).slice(0, 8);
@@ -127,9 +130,11 @@ export class GoToModal extends Modal {
 		if (!focusNode(this.ctl.activeCanvasView(), nodeId)) new Notice('Canvas не позволяет перейти к узлу в этой версии Obsidian; найдите его вручную.');
 	}
 
-	private async createNpc(query: string, toCombat: boolean): Promise<void> {
-		const r = quickNpc(findTemplate(query) ? query : query, newId);
-		if (!r) return;
+	private async createMonster(monsterId: string, toCombat: boolean): Promise<void> {
+		const m = monsterById(monsterId);
+		if (!m) return;
+		const tpl = CREATURE_TEMPLATES.find((t) => t.monsterId === monsterId);
+		const r = creatureFromMonster(m, newId, Math.random, { goldMax: tpl?.goldMax ?? 0 });
 		const out = await this.ctl.act({ type: 'cockpit/npc-create', creature: r.creature, statblock: r.statblock, items: r.items, purse: r.purse });
 		if (!out.ok) return;
 		if (toCombat) await addCreatureToCombat(this.ctl, r.creature.id);

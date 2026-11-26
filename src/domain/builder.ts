@@ -1,6 +1,7 @@
 // Character builder (by rules, 2014 SRD data) and quick NPC creation. Pure; ids and randomness are injected.
-import { ABILITIES, abilityMod, cockpitOf, emptySheet, profByLevel, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
-import { CLASSES, CREATURE_TEMPLATES, ITEM_TYPES, RACES, spellSlotsFor, type ClassDef, type CreatureTemplate } from './srd-data';
+import { ABILITIES, abilityMod, cockpitOf, emptySheet, isFinesse, profByLevel, type Abilities, type ItemInstance, type Purse, type Sheet, type Spellbook, type StatBlock } from './cockpit';
+import { CLASSES, CREATURE_TEMPLATES, ITEM_ID_ALIASES, ITEM_TYPES, monsterOf, RACES, spellSlotsFor, statBlockFromMonster, type ClassDef, type CreatureTemplate } from './srd-data';
+import type { SrdMonster } from './srd';
 import { emptyCharacter } from './state';
 import type { AbilityId, AdventureState, CharacterState, CreatureCard } from './types';
 import type { ItemType } from './cockpit';
@@ -10,6 +11,8 @@ export type IdFactory = (prefix: string) => string;
 export interface BuildChoices {
 	name: string;
 	raceId: string;
+	/** SRD subrace id (hill-dwarf, high-elf, lightfoot, rock-gnome); adds its own bonus on top of the parent race. */
+	subraceId?: string;
 	/** Picks for races with free bonuses (e.g. half-elf). */
 	freeBonusPicks?: AbilityId[];
 	classId: string;
@@ -66,12 +69,15 @@ export function armorClassFor(abilities: Abilities, equipped: ItemType[]): numbe
 export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): BuildResult {
 	const warnings: string[] = [];
 	const cls = classById(ch.classId);
-	const race = RACES.find((r) => r.id === ch.raceId);
+	const race = RACES.find((r) => r.id === ch.raceId && !r.parent);
+	const sub = ch.subraceId ? RACES.find((r) => r.id === ch.subraceId && r.parent === ch.raceId) : undefined;
+	if (ch.subraceId && !sub) throw new Error('Подраса не соответствует расе');
 	if (!cls) throw new Error('Неизвестный класс');
 	if (!race) throw new Error('Неизвестная раса');
 	const level = Math.max(1, Math.min(20, Math.floor(ch.level)));
 	const abilities: Abilities = { ...ch.baseAbilities };
 	for (const [k, v] of Object.entries(race.bonus)) abilities[k as AbilityId] += v ?? 0;
+	for (const [k, v] of Object.entries(sub?.bonus ?? {})) abilities[k as AbilityId] += v ?? 0;
 	if (race.freeBonus) {
 		const picks = [...new Set(ch.freeBonusPicks ?? [])].filter((p) => !race.freeBonus?.exclude.includes(p)).slice(0, race.freeBonus.count);
 		if (picks.length < race.freeBonus.count) warnings.push(`Не выбрано дополнительных бонусов характеристик: ${race.freeBonus.count - picks.length}`);
@@ -85,7 +91,7 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 	const character = emptyCharacter(newId('pc'), ch.name.trim() || 'Новый персонаж', ch.notePath);
 	character.classes = [{ name: cls.ru, level }];
 	character.hp = { current: hp, max: hp, temporary: 0 };
-	character.speedFeet = race.speed;
+	character.speedFeet = (sub ?? race).speed;
 	character.initiativeModifier = abilityMod(abilities.dex);
 	character.hitDice = [{ die: `d${cls.hitDie}` as 'd6', total: level, remaining: level }];
 	const slots = spellSlotsFor(cls.caster, level);
@@ -103,7 +109,7 @@ export function buildCharacter(ch: BuildChoices, newId: IdFactory, types: Readon
 
 	const sheet: Sheet = {
 		...emptySheet(),
-		race: race.ru,
+		race: sub ? sub.ru : race.ru,
 		background: ch.background,
 		subclass: ch.subclass,
 		abilities,
@@ -139,10 +145,10 @@ export interface QuickNpcResult {
 
 const normQ = (s: string): string => s.toLowerCase().replace(/ё/g, 'е');
 
-/** Words → weapon type id. First stem match wins; only weapons we have stats for. */
+/** Words → weapon type id (SRD ids). First stem match wins; only weapons that exist in the SRD data. */
 const WEAPON_WORDS: Array<[string, string]> = [
 	['кинжал', 'dagger'], ['нож', 'dagger'], ['скимитар', 'scimitar'], ['сабл', 'scimitar'], ['рапир', 'rapier'], ['длинн', 'longsword'], ['меч', 'shortsword'],
-	['дубин', 'club'], ['булав', 'mace'], ['топор', 'handaxe'], ['копь', 'spear'], ['посох', 'quarterstaff'], ['лук', 'shortbow'], ['арбалет', 'light-crossbow'], ['молот', 'warhammer'],
+	['дубин', 'club'], ['булав', 'mace'], ['топор', 'handaxe'], ['копь', 'spear'], ['посох', 'quarterstaff'], ['лук', 'shortbow'], ['арбалет', 'crossbow-light'], ['молот', 'warhammer'],
 ];
 
 export function findTemplate(query: string): CreatureTemplate | null {
@@ -164,36 +170,41 @@ function rollDice(expr: string, rng: () => number): number {
 }
 
 /**
- * "Гоблин-посетитель таверны с кинжалом" → SRD template + role text + requested weapon.
- * Origin is 'official' for an unmodified template, 'adapted' when the weapon/role differs.
- * Not scaled to party level (by design). Returns null when no template matches (GM picks one manually).
+ * Any SRD monster → creature card + stat block exactly as printed (origin 'official'), HP rolled from its dice.
+ * Nothing is scaled to party level. `weaponId` swaps the main melee attack for an SRD weapon (origin 'adapted'),
+ * the only place where bonus/damage are computed (ability mod + the creature's proficiency) instead of copied.
  */
+export function creatureFromMonster(m: SrdMonster, newId: IdFactory, rng: () => number = Math.random, opts: { role?: string; weaponId?: string | null; goldMax?: number } = {}, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): QuickNpcResult {
+	const creatureId = newId('crt');
+	const hp = m.hpDice ? rollDice(m.hpDice, rng) : m.hpAvg;
+	const block: StatBlock = { ...structuredClone(statBlockFromMonster(m)), creatureId, role: opts.role ?? '', kind: m.xp <= 1100 && /humanoid/i.test(m.typeLine) ? 'npc' : 'monster' };
+	const items: ItemInstance[] = [];
+	const wt = opts.weaponId ? types[opts.weaponId] : undefined;
+	if (wt && opts.weaponId) {
+		const a = weaponAttackFor(wt, block);
+		block.attacks = [{ id: opts.weaponId, name: wt.name, bonus: a.bonus, damage: a.damage, damageType: wt.damageType ?? '', range: a.range, notes: 'адаптировано под запрос (расчёт по характеристикам)' }, ...block.attacks.filter((x) => x.id !== opts.weaponId).slice(0, 1)];
+		block.origin = 'adapted';
+		block.sourceNote = `SRD 5.1 «${m.name}», оружие заменено по запросу`;
+		items.push({ id: newId('itm'), typeId: opts.weaponId, name: wt.name, ownerKind: 'creature', ownerId: creatureId, containerId: null, qty: 1, equipped: true, magicBonus: 0, note: '' });
+	} else {
+		// carry the weapons named in the printed attacks when the SRD has them (reference only)
+		for (const at of m.attacks.slice(0, 2)) {
+			const w = Object.values(types).find((t) => t.kind === 'weapon' && t.name.toLowerCase().replace(/,/g, '') === at.name.toLowerCase().replace(/,/g, ''));
+			if (w) items.push({ id: newId('itm'), typeId: w.id, name: w.name, ownerKind: 'creature', ownerId: creatureId, containerId: null, qty: 1, equipped: true, magicBonus: 0, note: '' });
+		}
+	}
+	if (opts.role) block.origin = block.origin === 'official' ? 'adapted' : block.origin;
+	const gold = Math.floor(rng() * ((opts.goldMax ?? 0) + 1));
+	const creature: CreatureCard = { id: creatureId, name: opts.role ? `${m.name} (${opts.role})` : m.name, aliases: [m.name], ac: m.acValue, hpMax: hp, initiativeModifier: abilityMod(block.abilities.dex), speed: block.speed, notes: block.sourceNote, source: { provider: 'local', ref: m.id } };
+	return { creature, statblock: block, items, purse: { pp: 0, gp: gold, ep: 0, sp: gold ? Math.floor(rng() * 10) : 0, cp: 0 }, note: `HP ${hp} (${m.hpDice ?? m.hpAvg}), КД ${m.ac}` };
+}
+
+/** "Гоблин-посетитель таверны с кинжалом" → SRD template + role text + requested weapon. null if no template matches. */
 export function quickNpc(query: string, newId: IdFactory, rng: () => number = Math.random, types: Readonly<Record<string, ItemType>> = ITEM_TYPES): QuickNpcResult | null {
 	const tpl = findTemplate(query);
-	if (!tpl) return null;
-	const weaponId = findWeapon(query);
-	const role = extractRole(query, tpl);
-	const creatureId = newId('crt');
-	const hp = rollDice(tpl.hpDice, rng);
-	const block: StatBlock = { ...structuredClone(tpl.block), creatureId, role, kind: 'npc' };
-	const items: ItemInstance[] = [];
-	const weaponIds = weaponId && types[weaponId] ? [weaponId] : tpl.weapons.slice(0, 1);
-	if (weaponId && types[weaponId]) {
-		const t = types[weaponId];
-		const a = weaponAttackFor(t, block);
-		block.attacks = [{ id: weaponId, name: t.name, bonus: a.bonus, damage: a.damage.replace(/\s/g, '').replace('−', '-'), damageType: t.damageType ?? '', range: a.range, notes: 'адаптировано под запрос' }, ...block.attacks.filter((x) => x.id !== weaponId).slice(0, 1)];
-		block.origin = 'adapted';
-		block.sourceNote = `SRD 5.1 «${tpl.name}», оружие заменено по запросу`;
-	}
-	if (role) block.origin = block.origin === 'official' ? 'adapted' : block.origin;
-	for (const id of weaponIds) {
-		const t = types[id];
-		if (t) items.push({ id: newId('itm'), typeId: id, name: t.name, ownerKind: 'creature', ownerId: creatureId, containerId: null, qty: 1, equipped: true, magicBonus: 0, note: '' });
-	}
-	const gold = Math.floor(rng() * (tpl.goldMax + 1));
-	const silver = Math.floor(rng() * 10);
-	const creature: CreatureCard = { id: creatureId, name: role ? `${tpl.name} (${role})` : tpl.name, aliases: [tpl.name], ac: tpl.ac, hpMax: hp, initiativeModifier: abilityMod(block.abilities.dex), speed: block.speed, notes: block.sourceNote, source: { provider: 'local', ref: tpl.id } };
-	return { creature, statblock: block, items, purse: { pp: 0, gp: gold, ep: 0, sp: silver, cp: 0 }, note: `HP ${hp} (${tpl.hpDice}), КД ${tpl.ac}${tpl.acNote ? ` (${tpl.acNote})` : ''}` };
+	const m = tpl ? monsterOf(tpl) : undefined;
+	if (!tpl || !m) return null;
+	return creatureFromMonster(m, newId, rng, { role: extractRole(query, tpl), weaponId: findWeapon(query), goldMax: tpl.goldMax }, types);
 }
 
 function extractRole(query: string, tpl: CreatureTemplate): string {
@@ -206,16 +217,16 @@ function extractRole(query: string, tpl: CreatureTemplate): string {
 function weaponAttackFor(t: ItemType, b: StatBlock): { bonus: number; damage: string; range: string } {
 	const sMod = abilityMod(b.abilities.str);
 	const dMod = abilityMod(b.abilities.dex);
-	const fin = t.properties.some((p) => /фехтов/.test(p));
-	const mod = t.reach === 'ranged' ? dMod : fin ? Math.max(sMod, dMod) : sMod;
-	return { bonus: mod + b.profBonus, damage: `${t.damage ?? '1'}${mod === 0 ? '' : mod > 0 ? `+${mod}` : `${mod}`}`, range: t.range ?? '5 фт' };
+	const mod = t.reach === 'ranged' ? dMod : isFinesse(t) ? Math.max(sMod, dMod) : sMod;
+	return { bonus: mod + b.profBonus, damage: `${t.damage ?? '1'}${mod === 0 ? '' : mod > 0 ? `+${mod}` : `${mod}`}`, range: t.range ?? '5 ft.' };
 }
 
 /** Item type lookup: adventure-local custom types first, then the built-in SRD table. */
 export function resolveItemType(state: AdventureState, item: ItemInstance): ItemType | null {
 	if (item.custom) return item.custom;
 	if (!item.typeId) return null;
-	return cockpitOf(state).itemTypes[item.typeId] ?? ITEM_TYPES[item.typeId] ?? null;
+	const c = cockpitOf(state).itemTypes;
+	return c[item.typeId] ?? ITEM_TYPES[item.typeId] ?? ITEM_TYPES[ITEM_ID_ALIASES[item.typeId] ?? ''] ?? null;
 }
 
 // ---- level up -----------------------------------------------------------------------------------

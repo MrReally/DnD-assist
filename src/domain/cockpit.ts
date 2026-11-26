@@ -97,6 +97,10 @@ export type ItemKind = 'weapon' | 'armor' | 'shield' | 'gear' | 'container' | 't
 export interface ItemType {
 	id: string;
 	name: string;
+	/** Display-only community translation (not from the SRD, unverified). */
+	ru?: string;
+	/** SRD-verified, user-entered, homebrew … (see srd.ts). */
+	verification?: string;
 	kind: ItemKind;
 	/** Price in copper pieces (integers only). */
 	costCp: number;
@@ -225,7 +229,7 @@ export interface AttackCalc {
 }
 
 export function isFinesse(t: ItemType): boolean {
-	return t.properties.some((p) => /^(фехтовальное|finesse)$/i.test(p));
+	return t.properties.some((p) => /^finesse\b/i.test(p));
 }
 
 /**
@@ -246,7 +250,7 @@ export function weaponAttack(t: ItemType, abilities: Abilities, prof: number, pr
 	const how = [`${ABILITY_RU[ability]} ${signed(mod)}`];
 	how.push(proficient ? `мастерство ${signed(prof)}` : 'без мастерства');
 	if (magic) how.push(`магический бонус ${signed(magic)}`);
-	return { bonus, damage, damageType: t.damageType ?? '', range: t.range ?? (t.reach === 'melee' ? '5 фт' : ''), how: [...how, `= ${signed(bonus)} к атаке`], ability, proficient };
+	return { bonus, damage, damageType: t.damageType ?? '', range: t.range ?? (t.reach === 'melee' ? '5 ft.' : ''), how: [...how, `= ${signed(bonus)} к атаке`], ability, proficient };
 }
 
 export function isProficientWith(t: ItemType, sheet: Sheet | undefined): boolean {

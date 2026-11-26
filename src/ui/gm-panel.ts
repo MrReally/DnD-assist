@@ -8,6 +8,7 @@ import { hpPercent, modText, parseHpInput, resolveCard, weaponItemsOf, type Atta
 import { levelUp, resolveItemType } from '../domain/builder';
 import { ABILITIES, ABILITY_RU, SKILLS, carriedWeight, cockpitOf, formatCost, formatWeight, isProficientWith, itemsOf, profBonusOf, purseOf, saveBonus, signed, skillBonus, spellAttackBonus, spellDc, weaponAttack, type ItemInstance, type Purse } from '../domain/cockpit';
 import { newId } from '../domain/ids';
+import { lookupSpell } from '../domain/spell-import';
 import { armorClassLabel } from '../domain/srd-data';
 import type { Controller } from '../controller';
 import type { Effect } from '../domain/types';
@@ -618,7 +619,7 @@ export class GmCockpitPanel extends ItemView {
 		const st = this.ctl.state;
 		if (!st || !m.characterId) return;
 		const ch = st.characters[m.characterId];
-		const sp = this.ctl.settings.spells.find((s) => s.id === id);
+		const sp = lookupSpell(this.ctl.settings.spells, id);
 		const ref = cockpitOf(st).spellbooks[m.characterId]?.known.find((k) => k.id === id);
 		if (!ch || (!sp && !ref)) return void body.createDiv({ cls: 'gmc-warn', text: 'Карточка заклинания отсутствует в локальной библиотеке. Откройте «Добавить заклинание» и импортируйте её заново.' });
 		const level = sp?.level ?? ref?.level ?? 0;

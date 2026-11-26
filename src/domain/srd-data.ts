@@ -1,195 +1,107 @@
-// Mechanical game facts from the D&D 5e SRD 5.1 (CC-BY-4.0, Wizards of the Coast): weapon/armor/gear stats,
-// a few basic creature stat blocks, class and race tables. Only numbers and short names — no descriptive text
-// from the books and nothing from TTG Club. Russian names follow the common Russian PHB terminology.
+// Mechanical game facts derived from the SRD 5.1 data file (see srd.ts) plus a few curated, SRD-verified tables.
+// Nothing numeric about items or creatures is typed in here: it comes from data/srd51/srd51.json, which is
+// generated from the official PDF and cross-checked by tests/unit/srd-reference.test.ts.
 import type { Abilities, ItemType, StatBlock } from './cockpit';
+import { monsterById, onSrd, type SrdData, type SrdMonster } from './srd';
 import type { AbilityId } from './types';
 
-const gp = (n: number): number => Math.round(n * 100);
-const sp = (n: number): number => Math.round(n * 10);
+/** Old (v1.1.0) item type ids → SRD ids, so saved items keep resolving. */
+export const ITEM_ID_ALIASES: Readonly<Record<string, string>> = {
+	'light-crossbow': 'crossbow-light', 'hand-crossbow': 'crossbow-hand', 'heavy-crossbow': 'crossbow-heavy',
+	rope: 'rope-hempen-50-feet', arrows: 'arrows-20', bolts: 'crossbow-bolts-20', lantern: 'lantern-bullseye',
+	rations: 'rations-1-day', 'healing-potion': 'potion-of-healing', 'thieves-tools': 'thieves-tools',
+};
 
-type W = [id: string, ru: string, cat: 'simple' | 'martial', reach: 'melee' | 'ranged', dmg: string, type: string, costCp: number, weight: number, props: string[], range?: string];
+/** Community terminology for display only. NOT from the SRD and NOT verified: the English SRD name is always kept. */
+export const RU_NAMES: Readonly<Record<string, string>> = {
+	club: 'Дубинка', dagger: 'Кинжал', greatclub: 'Палица', handaxe: 'Ручной топор', javelin: 'Метательное копьё', 'light-hammer': 'Лёгкий молот', mace: 'Булава', quarterstaff: 'Боевой посох', sickle: 'Серп', spear: 'Копьё',
+	'crossbow-light': 'Лёгкий арбалет', dart: 'Дротик', shortbow: 'Короткий лук', sling: 'Праща', battleaxe: 'Боевой топор', flail: 'Цеп', glaive: 'Глефа', greataxe: 'Секира', greatsword: 'Двуручный меч', halberd: 'Алебарда', lance: 'Копьё всадника',
+	longsword: 'Длинный меч', maul: 'Молот', morningstar: 'Моргенштерн', pike: 'Пика', rapier: 'Рапира', scimitar: 'Скимитар', shortsword: 'Короткий меч', trident: 'Трезубец', 'war-pick': 'Боевая кирка', warhammer: 'Боевой молот', whip: 'Кнут',
+	blowgun: 'Духовая трубка', 'crossbow-hand': 'Ручной арбалет', 'crossbow-heavy': 'Тяжёлый арбалет', longbow: 'Длинный лук', net: 'Сеть',
+	padded: 'Стёганый доспех', leather: 'Кожаный доспех', 'studded-leather': 'Проклёпанный кожаный доспех', hide: 'Шкурный доспех', 'chain-shirt': 'Кольчужная рубаха', 'scale-mail': 'Чешуйчатый доспех', breastplate: 'Кираса', 'half-plate': 'Полулаты', 'ring-mail': 'Колечный доспех', 'chain-mail': 'Кольчуга', splint: 'Пластинчатый доспех', plate: 'Латы', shield: 'Щит',
+	backpack: 'Рюкзак', sack: 'Мешок', pouch: 'Поясной кошель', chest: 'Сундук', torch: 'Факел', bedroll: 'Спальник', tinderbox: 'Трутница', waterskin: 'Бурдюк', 'potion-of-healing': 'Зелье лечения', 'rope-hempen-50-feet': 'Верёвка пеньковая (50 фт)', 'rations-1-day': 'Рацион (1 день)', 'thieves-tools': 'Воровские инструменты',
+};
 
-const WEAPONS: W[] = [
-	['club', 'Дубинка', 'simple', 'melee', '1d4', 'дробящий', sp(1), 2, ['лёгкое']],
-	['dagger', 'Кинжал', 'simple', 'melee', '1d4', 'колющий', gp(2), 1, ['фехтовальное', 'лёгкое', 'метательное'], '5 фт / метание 20/60'],
-	['greatclub', 'Палица', 'simple', 'melee', '1d8', 'дробящий', sp(2), 10, ['двуручное']],
-	['handaxe', 'Ручной топор', 'simple', 'melee', '1d6', 'рубящий', gp(5), 2, ['лёгкое', 'метательное'], '5 фт / метание 20/60'],
-	['javelin', 'Метательное копьё', 'simple', 'melee', '1d6', 'колющий', sp(5), 2, ['метательное'], '5 фт / метание 30/120'],
-	['light-hammer', 'Лёгкий молот', 'simple', 'melee', '1d4', 'дробящий', gp(2), 2, ['лёгкое', 'метательное'], '5 фт / метание 20/60'],
-	['mace', 'Булава', 'simple', 'melee', '1d6', 'дробящий', gp(5), 4, []],
-	['quarterstaff', 'Боевой посох', 'simple', 'melee', '1d6', 'дробящий', sp(2), 4, ['универсальное (1d8)']],
-	['sickle', 'Серп', 'simple', 'melee', '1d4', 'рубящий', gp(1), 2, ['лёгкое']],
-	['spear', 'Копьё', 'simple', 'melee', '1d6', 'колющий', gp(1), 3, ['метательное', 'универсальное (1d8)'], '5 фт / метание 20/60'],
-	['light-crossbow', 'Лёгкий арбалет', 'simple', 'ranged', '1d8', 'колющий', gp(25), 5, ['боеприпас', 'перезарядка', 'двуручное'], '80/320'],
-	['dart', 'Дротик', 'simple', 'ranged', '1d4', 'колющий', 5, 0.25, ['фехтовальное', 'метательное'], '20/60'],
-	['shortbow', 'Короткий лук', 'simple', 'ranged', '1d6', 'колющий', gp(25), 2, ['боеприпас', 'двуручное'], '80/320'],
-	['sling', 'Праща', 'simple', 'ranged', '1d4', 'дробящий', sp(1), 0, ['боеприпас'], '30/120'],
-	['battleaxe', 'Боевой топор', 'martial', 'melee', '1d8', 'рубящий', gp(10), 4, ['универсальное (1d10)']],
-	['flail', 'Цеп', 'martial', 'melee', '1d8', 'дробящий', gp(10), 2, []],
-	['glaive', 'Глефа', 'martial', 'melee', '1d10', 'рубящий', gp(20), 6, ['тяжёлое', 'досягаемость', 'двуручное'], '10 фт'],
-	['greataxe', 'Секира', 'martial', 'melee', '1d12', 'рубящий', gp(30), 7, ['тяжёлое', 'двуручное']],
-	['greatsword', 'Двуручный меч', 'martial', 'melee', '2d6', 'рубящий', gp(50), 6, ['тяжёлое', 'двуручное']],
-	['halberd', 'Алебарда', 'martial', 'melee', '1d10', 'рубящий', gp(20), 6, ['тяжёлое', 'досягаемость', 'двуручное'], '10 фт'],
-	['lance', 'Копьё всадника', 'martial', 'melee', '1d12', 'колющий', gp(10), 6, ['досягаемость', 'особое'], '10 фт'],
-	['longsword', 'Длинный меч', 'martial', 'melee', '1d8', 'рубящий', gp(15), 3, ['универсальное (1d10)']],
-	['maul', 'Молот', 'martial', 'melee', '2d6', 'дробящий', gp(10), 10, ['тяжёлое', 'двуручное']],
-	['morningstar', 'Моргенштерн', 'martial', 'melee', '1d8', 'колющий', gp(15), 4, []],
-	['pike', 'Пика', 'martial', 'melee', '1d10', 'колющий', gp(5), 18, ['тяжёлое', 'досягаемость', 'двуручное'], '10 фт'],
-	['rapier', 'Рапира', 'martial', 'melee', '1d8', 'колющий', gp(25), 2, ['фехтовальное']],
-	['scimitar', 'Скимитар', 'martial', 'melee', '1d6', 'рубящий', gp(25), 3, ['фехтовальное', 'лёгкое']],
-	['shortsword', 'Короткий меч', 'martial', 'melee', '1d6', 'колющий', gp(10), 2, ['фехтовальное', 'лёгкое']],
-	['trident', 'Трезубец', 'martial', 'melee', '1d6', 'колющий', gp(5), 4, ['метательное', 'универсальное (1d8)'], '5 фт / метание 20/60'],
-	['war-pick', 'Боевая кирка', 'martial', 'melee', '1d8', 'колющий', gp(5), 2, []],
-	['warhammer', 'Боевой молот', 'martial', 'melee', '1d8', 'дробящий', gp(15), 2, ['универсальное (1d10)']],
-	['whip', 'Кнут', 'martial', 'melee', '1d4', 'рубящий', gp(2), 3, ['фехтовальное', 'досягаемость'], '10 фт'],
-	['hand-crossbow', 'Ручной арбалет', 'martial', 'ranged', '1d6', 'колющий', gp(75), 3, ['боеприпас', 'лёгкое', 'перезарядка'], '30/120'],
-	['heavy-crossbow', 'Тяжёлый арбалет', 'martial', 'ranged', '1d10', 'колющий', gp(50), 18, ['боеприпас', 'тяжёлое', 'перезарядка', 'двуручное'], '100/400'],
-	['longbow', 'Длинный лук', 'martial', 'ranged', '1d8', 'колющий', gp(50), 2, ['боеприпас', 'тяжёлое', 'двуручное'], '150/600'],
-];
+/** Property terms: English SRD term → common Russian term (display aid, unverified translation). */
+export const PROPERTY_RU: Readonly<Record<string, string>> = {
+	ammunition: 'боеприпас', finesse: 'фехтовальное', heavy: 'тяжёлое', light: 'лёгкое', loading: 'перезарядка', reach: 'досягаемость', special: 'особое', thrown: 'метательное', 'two-handed': 'двуручное', versatile: 'универсальное',
+};
 
-type A = [id: string, ru: string, base: number, dex: 'full' | 'max2' | 'none', costCp: number, weight: number, minStr?: number, stealth?: boolean];
-const ARMOR: A[] = [
-	['padded', 'Стёганый доспех', 11, 'full', gp(5), 8, undefined, true],
-	['leather', 'Кожаный доспех', 11, 'full', gp(10), 10],
-	['studded-leather', 'Проклёпанный кожаный доспех', 12, 'full', gp(45), 13],
-	['hide', 'Шкурный доспех', 12, 'max2', gp(10), 12],
-	['chain-shirt', 'Кольчужная рубаха', 13, 'max2', gp(50), 20],
-	['scale-mail', 'Чешуйчатый доспех', 14, 'max2', gp(50), 45, undefined, true],
-	['breastplate', 'Кираса', 14, 'max2', gp(400), 20],
-	['half-plate', 'Полулаты', 15, 'max2', gp(750), 40, undefined, true],
-	['ring-mail', 'Колечный доспех', 14, 'none', gp(30), 40, undefined, true],
-	['chain-mail', 'Кольчуга', 16, 'none', gp(75), 55, 13, true],
-	['splint', 'Пластинчатый доспех', 17, 'none', gp(200), 60, 15, true],
-	['plate', 'Латы', 18, 'none', gp(1500), 65, 15, true],
-];
-
-const GEAR: Array<[id: string, ru: string, kind: ItemType['kind'], cp: number, w: number]> = [
-	['backpack', 'Рюкзак', 'container', gp(2), 5],
-	['sack', 'Мешок', 'container', 1, 0.5],
-	['pouch', 'Поясной кошель', 'container', sp(5), 1],
-	['chest', 'Сундук', 'container', gp(5), 25],
-	['rope', 'Верёвка пеньковая (50 фт)', 'gear', gp(1), 10],
-	['torch', 'Факел', 'gear', 1, 1],
-	['rations', 'Рацион (1 день)', 'gear', sp(5), 2],
-	['waterskin', 'Бурдюк', 'gear', sp(2), 5],
-	['bedroll', 'Спальник', 'gear', gp(1), 7],
-	['tinderbox', 'Трутница', 'gear', sp(5), 1],
-	['thieves-tools', 'Воровские инструменты', 'gear', gp(25), 1],
-	['lantern', 'Фонарь с лучом', 'gear', gp(10), 2],
-	['arrows', 'Стрелы (20)', 'gear', gp(1), 1],
-	['bolts', 'Арбалетные болты (20)', 'gear', gp(1), 1.5],
-	['healing-potion', 'Зелье лечения', 'magic', gp(50), 0.5],
-];
-
-function build(): Record<string, ItemType> {
-	const out: Record<string, ItemType> = {};
-	for (const [id, name, category, reach, damage, damageType, costCp, weight, properties, range] of WEAPONS) {
-		out[id] = { id, name, kind: 'weapon', category, reach, damage, damageType, costCp, weight, properties, ...(range ? { range } : reach === 'melee' ? { range: '5 фт' } : {}) };
-	}
-	for (const [id, name, base, dex, costCp, weight, minStr, stealthDis] of ARMOR) {
-		out[id] = { id, name, kind: 'armor', costCp, weight, properties: [], ac: { base, dex, ...(minStr ? { minStr } : {}), ...(stealthDis ? { stealthDis: true } : {}) } };
-	}
-	out.shield = { id: 'shield', name: 'Щит', kind: 'shield', costCp: gp(10), weight: 6, properties: [], ac: { base: 2, dex: 'none', bonus: true } };
-	for (const [id, name, kind, costCp, weight] of GEAR) out[id] = { id, name, kind, costCp, weight, properties: [] };
-	return out;
+export function propertyLabel(p: string): string {
+	const key = /^[a-z-]+/i.exec(p)?.[0]?.toLowerCase() ?? '';
+	const ru = PROPERTY_RU[key];
+	return ru ? `${p} (${ru})` : p;
 }
 
-export const ITEM_TYPES: Readonly<Record<string, ItemType>> = Object.freeze(build());
+const CONTAINERS = new Set(['backpack', 'sack', 'pouch', 'chest', 'barrel', 'basket', 'bag-of-holding']);
+
+/** Filled when the SRD file is loaded. Keys are SRD ids. */
+export const ITEM_TYPES: Record<string, ItemType> = {};
+
+onSrd((d: SrdData) => {
+	for (const k of Object.keys(ITEM_TYPES)) delete ITEM_TYPES[k];
+	for (const w of d.weapons) {
+		const props = w.properties.map((p) => p.charAt(0).toLowerCase() + p.slice(1));
+		ITEM_TYPES[w.id] = { id: w.id, name: w.name, ...(RU_NAMES[w.id] ? { ru: RU_NAMES[w.id] } : {}), kind: 'weapon', category: w.category, reach: w.reach, ...(w.damage ? { damage: w.damage } : {}), ...(w.damageType ? { damageType: w.damageType } : {}), costCp: w.costCp, weight: w.weight ?? 0, properties: props, range: w.range ?? (w.reach === 'melee' ? '5 ft.' : '') , verification: w.verification };
+	}
+	for (const a of d.armor) {
+		ITEM_TYPES[a.id] = { id: a.id, name: a.name, ...(RU_NAMES[a.id] ? { ru: RU_NAMES[a.id] } : {}), kind: a.type === 'shield' ? 'shield' : 'armor', costCp: a.costCp, weight: a.weight ?? 0, properties: [], ac: { base: a.acBonus ?? a.baseAc, dex: a.dex, ...(a.minStr ? { minStr: a.minStr } : {}), ...(a.stealthDisadvantage ? { stealthDis: true } : {}), ...(a.type === 'shield' ? { bonus: true } : {}) }, verification: a.verification };
+	}
+	for (const g of d.gear) {
+		if (ITEM_TYPES[g.id]) continue;
+		ITEM_TYPES[g.id] = { id: g.id, name: g.name, ...(RU_NAMES[g.id] ? { ru: RU_NAMES[g.id] } : {}), kind: CONTAINERS.has(g.id) ? 'container' : /potion/.test(g.id) ? 'magic' : 'gear', costCp: g.costCp, weight: g.weight ?? 0, properties: [], verification: g.verification };
+	}
+});
 
 export function armorClassLabel(t: ItemType): string {
 	if (!t.ac) return '';
 	const a = t.ac;
 	if (a.bonus) return `+${a.base}`;
-	return a.dex === 'full' ? `${a.base} + ЛОВ` : a.dex === 'max2' ? `${a.base} + ЛОВ (макс. 2)` : `${a.base}`;
+	return a.dex === 'full' ? `${a.base} + Dex` : a.dex === 'max2' ? `${a.base} + Dex (max 2)` : `${a.base}`;
 }
 
-// ---- basic SRD creatures ----------------------------------------------------------------------
+// ---- creatures from SRD stat blocks -------------------------------------------------------------
 
-const ab = (str: number, dex: number, con: number, int: number, wis: number, cha: number): Abilities => ({ str, dex, con, int, wis, cha });
+const profFromCr = (cr: string): number => {
+	const n = cr.includes('/') ? Number(cr.split('/')[0]) / Number(cr.split('/')[1]) : Number(cr);
+	return n < 5 ? 2 : n < 9 ? 3 : n < 13 ? 4 : n < 17 ? 5 : n < 21 ? 6 : n < 25 ? 7 : n < 29 ? 8 : 9;
+};
+
+/** Statblock for an SRD monster, as printed (attack bonuses, damage and everything else are the book's). */
+export function statBlockFromMonster(m: SrdMonster): Omit<StatBlock, 'creatureId'> {
+	const features = (t: string): Array<{ name: string; text: string }> => (t ? [{ name: 'SRD', text: t }] : []);
+	return {
+		kind: 'monster', type: m.typeLine, role: '', cr: m.cr, profBonus: profFromCr(m.cr), abilities: { ...m.abilities },
+		saves: m.saves ?? '', skills: m.skills ?? '', resist: m.resistances ?? '', immune: m.immunities ?? '', vuln: m.vulnerabilities ?? '', conditionImmune: m.conditionImmunities ?? '',
+		senses: m.senses ?? '', languages: m.languages ?? '', speed: m.speed ?? '', traits: features(m.traitsText), actions: features(m.actionsText),
+		attacks: m.attacks.map((a) => ({ id: a.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name: a.name, bonus: a.bonus, damage: a.damage, damageType: a.damageType, range: a.range ?? a.reach ?? '', notes: a.kind })),
+		origin: 'official', sourceNote: `D&D 5e SRD 5.1 (CC-BY-4.0) — ${m.name}`,
+	};
+}
 
 export interface CreatureTemplate {
 	id: string;
-	/** Search keywords (lower-case, ё→е). */
+	monsterId: string;
+	/** Search keywords (lower-case, ё→е); Russian words are search aids only. */
 	keys: string[];
 	name: string;
-	hpAvg: number;
-	hpDice: string;
-	ac: number;
-	acNote: string;
-	block: Omit<StatBlock, 'creatureId'>;
-	/** Weapon type ids the creature carries by default (first = main melee). */
-	weapons: string[];
-	/** Starting purse range in gold. */
 	goldMax: number;
 }
 
-const base = (kind: StatBlock['kind'], type: string, cr: string, abilities: Abilities, extra: Partial<StatBlock>): Omit<StatBlock, 'creatureId'> => ({
-	kind, type, role: '', cr, profBonus: 2, abilities, saves: '', skills: '', resist: '', immune: '', vuln: '', conditionImmune: '', senses: '', languages: '', speed: '30 фт', traits: [], actions: [], attacks: [], origin: 'official', sourceNote: 'D&D 5e SRD 5.1 (CC-BY-4.0)', ...extra,
-});
-
+/** Keyword → SRD monster. Which monsters carry coins is a GM-facing convenience, not SRD data. */
 export const CREATURE_TEMPLATES: readonly CreatureTemplate[] = [
-	{
-		id: 'goblin', keys: ['гоблин', 'goblin'], name: 'Гоблин', hpAvg: 7, hpDice: '2d6', ac: 15, acNote: 'кожаный доспех, щит', weapons: ['scimitar', 'shortbow'], goldMax: 3,
-		block: base('monster', 'Небольшой гуманоид (гоблиноид), нейтрально-злой', '1/4', ab(8, 14, 10, 10, 8, 8), {
-			skills: 'Скрытность +6', senses: 'тёмное зрение 60 фт., пассивное Восприятие 9', languages: 'Общий, Гоблинский',
-			traits: [{ name: 'Проворный побег', text: 'Бонусным действием может совершить Отход или Засаду.' }],
-			attacks: [
-				{ id: 'scimitar', name: 'Скимитар', bonus: 4, damage: '1d6+2', damageType: 'рубящий', range: '5 фт', notes: 'ближний бой' },
-				{ id: 'shortbow', name: 'Короткий лук', bonus: 4, damage: '1d6+2', damageType: 'колющий', range: '80/320', notes: 'дальний бой' },
-			],
-		}),
-	},
-	{
-		id: 'bandit', keys: ['бандит', 'разбойник', 'bandit'], name: 'Бандит', hpAvg: 11, hpDice: '2d8+2', ac: 12, acNote: 'кожаный доспех', weapons: ['scimitar', 'light-crossbow'], goldMax: 8,
-		block: base('npc', 'Средний гуманоид, любое не-законное мировоззрение', '1/8', ab(11, 12, 12, 10, 10, 10), {
-			languages: 'Общий, один любой',
-			attacks: [
-				{ id: 'scimitar', name: 'Скимитар', bonus: 3, damage: '1d6+1', damageType: 'рубящий', range: '5 фт', notes: '' },
-				{ id: 'light-crossbow', name: 'Лёгкий арбалет', bonus: 3, damage: '1d8+1', damageType: 'колющий', range: '80/320', notes: '' },
-			],
-		}),
-	},
-	{
-		id: 'guard', keys: ['стражник', 'страж', 'охранник', 'guard'], name: 'Стражник', hpAvg: 11, hpDice: '2d8+2', ac: 16, acNote: 'кольчужная рубаха, щит', weapons: ['spear'], goldMax: 5,
-		block: base('npc', 'Средний гуманоид, любое мировоззрение', '1/8', ab(13, 12, 12, 10, 11, 10), {
-			skills: 'Восприятие +2', senses: 'пассивное Восприятие 12', languages: 'Общий, один любой',
-			attacks: [{ id: 'spear', name: 'Копьё', bonus: 3, damage: '1d6+1', damageType: 'колющий', range: '5 фт / метание 20/60', notes: '' }],
-		}),
-	},
-	{
-		id: 'commoner', keys: ['простолюдин', 'посетитель', 'крестьянин', 'commoner', 'горожанин', 'трактирщик'], name: 'Простолюдин', hpAvg: 4, hpDice: '1d8', ac: 10, acNote: '', weapons: ['club'], goldMax: 2,
-		block: base('npc', 'Средний гуманоид, любое мировоззрение', '0', ab(10, 10, 10, 10, 10, 10), {
-			languages: 'Общий, один любой', attacks: [{ id: 'club', name: 'Дубинка', bonus: 2, damage: '1d4', damageType: 'дробящий', range: '5 фт', notes: '' }],
-		}),
-	},
-	{
-		id: 'thug', keys: ['головорез', 'бугай', 'громила', 'thug'], name: 'Головорез', hpAvg: 32, hpDice: '5d8+10', ac: 11, acNote: 'кожаный доспех', weapons: ['mace', 'heavy-crossbow'], goldMax: 10,
-		block: base('npc', 'Средний гуманоид, любое не-доброе мировоззрение', '1/2', ab(15, 11, 14, 10, 10, 11), {
-			skills: 'Запугивание +2', languages: 'Общий, один любой',
-			traits: [{ name: 'Тактика стаи', text: 'Преимущество на бросок атаки, если союзник стоит в пределах 5 фт от цели и не выведен из строя.' }],
-			actions: [{ name: 'Мультиатака', text: 'Две атаки в ближнем бою.' }],
-			attacks: [
-				{ id: 'mace', name: 'Булава', bonus: 4, damage: '1d6+2', damageType: 'дробящий', range: '5 фт', notes: '' },
-				{ id: 'heavy-crossbow', name: 'Тяжёлый арбалет', bonus: 2, damage: '1d10', damageType: 'колющий', range: '100/400', notes: '' },
-			],
-		}),
-	},
-	{
-		id: 'cultist', keys: ['культист', 'cultist', 'фанатик'], name: 'Культист', hpAvg: 9, hpDice: '2d8', ac: 12, acNote: 'кожаный доспех', weapons: ['scimitar'], goldMax: 4,
-		block: base('npc', 'Средний гуманоид, любое не-доброе мировоззрение', '1/8', ab(11, 12, 10, 10, 11, 10), {
-			skills: 'Религия +2, Обман +2', languages: 'Общий, один любой',
-			traits: [{ name: 'Тёмная преданность', text: 'Преимущество на спасброски от очарования и испуга.' }],
-			attacks: [{ id: 'scimitar', name: 'Скимитар', bonus: 3, damage: '1d6+1', damageType: 'рубящий', range: '5 фт', notes: '' }],
-		}),
-	},
-	{
-		id: 'noble', keys: ['дворянин', 'аристократ', 'noble', 'барон'], name: 'Дворянин', hpAvg: 9, hpDice: '2d8', ac: 15, acNote: 'кираса', weapons: ['rapier'], goldMax: 40,
-		block: base('npc', 'Средний гуманоид, любое мировоззрение', '1/8', ab(11, 12, 11, 12, 14, 16), {
-			skills: 'Обман +5, Проницательность +4, Убеждение +5', languages: 'Общий, два любых',
-			attacks: [{ id: 'rapier', name: 'Рапира', bonus: 3, damage: '1d8+1', damageType: 'колющий', range: '5 фт', notes: '' }],
-		}),
-	},
+	{ id: 'goblin', monsterId: 'goblin', keys: ['гоблин', 'goblin'], name: 'Goblin', goldMax: 3 },
+	{ id: 'bandit', monsterId: 'bandit', keys: ['бандит', 'разбойник', 'bandit'], name: 'Bandit', goldMax: 8 },
+	{ id: 'guard', monsterId: 'guard', keys: ['стражник', 'страж', 'охранник', 'guard'], name: 'Guard', goldMax: 5 },
+	{ id: 'commoner', monsterId: 'commoner', keys: ['простолюдин', 'посетитель', 'крестьянин', 'commoner', 'горожанин', 'трактирщик'], name: 'Commoner', goldMax: 2 },
+	{ id: 'thug', monsterId: 'thug', keys: ['головорез', 'бугай', 'громила', 'thug'], name: 'Thug', goldMax: 10 },
+	{ id: 'cultist', monsterId: 'cultist', keys: ['культист', 'cultist', 'фанатик'], name: 'Cultist', goldMax: 4 },
+	{ id: 'noble', monsterId: 'noble', keys: ['дворянин', 'аристократ', 'noble', 'барон'], name: 'Noble', goldMax: 40 },
 ];
+
+export function monsterOf(t: CreatureTemplate): SrdMonster | undefined {
+	return monsterById(t.monsterId);
+}
 
 // ---- classes, races, slots --------------------------------------------------------------------
 
@@ -225,6 +137,8 @@ export const CLASSES: readonly ClassDef[] = [
 
 export interface RaceDef {
 	id: string;
+	/** Parent race id for SRD subraces. */
+	parent?: string;
 	ru: string;
 	bonus: Partial<Record<AbilityId, number>>;
 	/** Free +1 choices (Half-Elf gets +1 to two others). */
@@ -235,11 +149,15 @@ export interface RaceDef {
 /** SRD 5.1 races (PHB 2014 values). Races not listed here are not offered: enter them via quick fill. */
 export const RACES: readonly RaceDef[] = [
 	{ id: 'dwarf', ru: 'Дварф', bonus: { con: 2 }, speed: 25 },
+	{ id: 'hill-dwarf', parent: 'dwarf', ru: 'Холмовой дварф', bonus: { wis: 1 }, speed: 25 },
 	{ id: 'elf', ru: 'Эльф', bonus: { dex: 2 }, speed: 30 },
+	{ id: 'high-elf', parent: 'elf', ru: 'Высший эльф', bonus: { int: 1 }, speed: 30 },
 	{ id: 'halfling', ru: 'Полурослик', bonus: { dex: 2 }, speed: 25 },
+	{ id: 'lightfoot', parent: 'halfling', ru: 'Легконогий полурослик', bonus: { cha: 1 }, speed: 25 },
 	{ id: 'human', ru: 'Человек', bonus: { str: 1, dex: 1, con: 1, int: 1, wis: 1, cha: 1 }, speed: 30 },
 	{ id: 'dragonborn', ru: 'Драконорождённый', bonus: { str: 2, cha: 1 }, speed: 30 },
 	{ id: 'gnome', ru: 'Гном', bonus: { int: 2 }, speed: 25 },
+	{ id: 'rock-gnome', parent: 'gnome', ru: 'Скальный гном', bonus: { con: 1 }, speed: 25 },
 	{ id: 'half-elf', ru: 'Полуэльф', bonus: { cha: 2 }, freeBonus: { count: 2, amount: 1, exclude: ['cha'] }, speed: 30 },
 	{ id: 'half-orc', ru: 'Полуорк', bonus: { str: 2, con: 1 }, speed: 30 },
 	{ id: 'tiefling', ru: 'Тифлинг', bonus: { int: 1, cha: 2 }, speed: 30 },

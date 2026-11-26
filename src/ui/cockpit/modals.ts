@@ -7,9 +7,10 @@ import { emptyEncounter } from '../../domain/encounter';
 import { nextTieOrder } from '../../domain/combat';
 import { newId } from '../../domain/ids';
 import { sanitizeFileName } from '../../domain/normalize';
-import { importSpell, upsertSpell, validateCard, type SpellCard } from '../../domain/spell-import';
+import { importSpell, lookupSpell, searchSpells, upsertSpell, validateCard, type SpellCard } from '../../domain/spell-import';
 import { buildCueMessage, validateBinding, type CueBinding, type CueCommand } from '../../domain/lightkey';
 import { CLASSES, ITEM_TYPES, RACES } from '../../domain/srd-data';
+void lookupSpell;
 import type { Controller } from '../../controller';
 import { DgramTransport, sendCue } from '../../adapters/osc-transport';
 import { button } from '../common';
@@ -401,13 +402,12 @@ export class SpellImportModal extends Modal {
 
 	private renderFind(el: HTMLElement): void {
 		el.createDiv({ cls: 'gmc-dim', text: 'Название из локальной библиотеки или ссылка https://5e14.ttg.club/spells/…. Текст с TTG автоматически не загружается (условия сайта); сохранённые карточки работают офлайн.' });
-		field(el, 'Название или ссылка', this.input, (v) => (this.input = v), 'si-input');
+		field(el, 'Название или ссылка', this.input, (v) => { this.input = v; this.render(); }, 'si-input');
 		const lib = this.ctl.settings.spells;
 		const list = el.createDiv({ cls: 'gmc-pick' });
-		const q = this.input.trim().toLowerCase().replace(/ё/g, 'е');
-		for (const sp of lib.filter((x) => !q || x.name.toLowerCase().replace(/ё/g, 'е').includes(q)).slice(0, 30)) {
+		for (const sp of searchSpells(lib, /^https?:/i.test(this.input) ? '' : this.input, 40)) {
 			const row = list.createDiv({ cls: 'gmc-pickrow', attr: { tabindex: '0', role: 'button', 'data-testid': `si-lib-${sp.id}` } });
-			row.createSpan({ text: `${sp.name} · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}` });
+			row.createSpan({ text: `${sp.name} · ${sp.level === 0 ? 'заговор' : `${sp.level} ур.`}${sp.origin === 'srd' ? ' · SRD' : ''}` });
 			row.addEventListener('click', () => void this.finish(sp));
 			row.addEventListener('keydown', (e) => e.key === 'Enter' && void this.finish(sp));
 		}
@@ -463,9 +463,11 @@ export class SpellImportModal extends Modal {
 	}
 
 	private async finish(card: SpellCard): Promise<void> {
-		const v = validateCard(card, card.origin);
-		this.ctl.settings.spells = upsertSpell(this.ctl.settings.spells, { ...v, id: card.id || v.id });
-		await this.ctl.saveSettings();
+		if (card.origin !== 'srd') {
+			const v = validateCard(card, card.origin);
+			this.ctl.settings.spells = upsertSpell(this.ctl.settings.spells, { ...v, id: card.id || v.id });
+			await this.ctl.saveSettings();
+		}
 		if (this.characterId) {
 			const book = cockpitOf(this.ctl.state as NonNullable<typeof this.ctl.state>).spellbooks[this.characterId] ?? { known: [], prepared: [] };
 			if (!book.known.some((k) => k.id === card.id)) {

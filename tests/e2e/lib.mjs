@@ -61,6 +61,7 @@ export function installPlugin(vault) {
 	mkdirSync(dir, { recursive: true });
 	const src = process.env.CA_E2E_FROM_RELEASE ? join(REPO, 'release') : REPO;
 	for (const f of ['main.js', 'manifest.json', 'styles.css']) cpSync(join(src, f), join(dir, f));
+	cpSync(process.env.CA_E2E_FROM_RELEASE ? join(src, 'srd51.json') : join(REPO, 'data', 'srd51', 'srd51.json'), join(dir, 'srd51.json'));
 }
 
 export class ObsidianApp {

@@ -1,6 +1,7 @@
 import { Notice, Plugin, requestUrl, type EventRef, type Menu, type WorkspaceLeaf } from 'obsidian';
 import { cardTargetForNote, creatureForNote } from './domain/card';
 import { relativeTo } from './domain/normalize';
+import { isSrdData, setSrd, SRD_FILE } from './domain/srd';
 import { isRoomNote } from './domain/room';
 import { CheckpointModal, goBackToPreviousArea, goToViewPoint, ViewPointsModal } from './ui/cockpit/canvas-modals';
 import { GoToModal } from './ui/cockpit/goto-modal';
@@ -29,6 +30,7 @@ export default class CanvasAssistPlugin extends Plugin {
 
 	override async onload(): Promise<void> {
 		this.cfg = mergeSettings(await this.loadData());
+		await this.loadSrd();
 		this.ctl = new Controller({
 			app: this.app,
 			settings: this.cfg,
@@ -106,6 +108,21 @@ export default class CanvasAssistPlugin extends Plugin {
 		this.canvasWatch.clear();
 		void this.ctl.shutdown();
 		delete (window as unknown as { canvasAssist?: unknown }).canvasAssist;
+	}
+
+	/** Loads the SRD 5.1 reference (shipped next to main.js). Missing/corrupt file → the plugin works without the built-in library. */
+	private async loadSrd(): Promise<void> {
+		const dir = this.manifest.dir;
+		if (!dir) return;
+		try {
+			const raw = await this.app.vault.adapter.read(`${dir}/${SRD_FILE}`);
+			const data: unknown = JSON.parse(raw);
+			if (!isSrdData(data)) throw new Error('unexpected structure');
+			setSrd(data);
+		} catch (e) {
+			console.error('[Canvas Assist] SRD data not loaded', e);
+			new Notice(`Canvas Assist: справочник SRD не найден или повреждён (${SRD_FILE} рядом с main.js). Работают пользовательские данные; переустановите плагин из архива.`, 10000);
+		}
 	}
 
 	async saveSettings(): Promise<void> {

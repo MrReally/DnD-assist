@@ -18,7 +18,7 @@ export interface SpellCard {
 	higherLevels?: string;
 	source: string;
 	/** How we got it; the text is kept only if the GM supplied it. */
-	origin: 'manual' | 'json' | 'local';
+	origin: 'manual' | 'json' | 'local' | 'srd';
 	url?: string;
 }
 
@@ -166,4 +166,27 @@ export function importSpell(input: SpellInput, library: readonly SpellCard[], im
 /** Pure upsert by id; returns a new array (library is stored locally and works offline). */
 export function upsertSpell(library: readonly SpellCard[], card: SpellCard): SpellCard[] {
 	return [...library.filter((c) => c.id !== card.id), card].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+
+import { getSrd, type SrdSpell } from './srd';
+
+/** SRD spell → card (read-only reference; never copied into the user's library). */
+export function spellCardFromSrd(s: SrdSpell): SpellCard {
+	return { id: s.id, name: s.name, level: s.level, school: s.school, castingTime: s.castingTime, range: s.range, components: s.material ? `${s.components} (${s.material})` : s.components, duration: s.duration, concentration: s.concentration, ritual: s.ritual, text: s.text, ...(s.higherLevels ? { higherLevels: s.higherLevels } : {}), source: 'SRD 5.1 (CC-BY-4.0)', origin: 'srd' };
+}
+
+/** User library first (GM edits win), then the SRD. */
+export function lookupSpell(library: readonly SpellCard[], id: string): SpellCard | null {
+	const own = library.find((c) => c.id === id);
+	if (own) return own;
+	const s = getSrd()?.spells.find((x) => x.id === id);
+	return s ? spellCardFromSrd(s) : null;
+}
+
+export function searchSpells(library: readonly SpellCard[], query: string, limit = 30): SpellCard[] {
+	const q = query.trim().toLowerCase().replace(/ё/g, 'е');
+	const own = library.filter((c) => !q || c.name.toLowerCase().replace(/ё/g, 'е').includes(q));
+	const ids = new Set(own.map((c) => c.id));
+	const srd = (getSrd()?.spells ?? []).filter((s) => !ids.has(s.id) && (!q || s.name.toLowerCase().includes(q) || s.id.includes(q))).map(spellCardFromSrd);
+	return [...own, ...srd].slice(0, limit);
 }

@@ -24,7 +24,7 @@ describe('rules', () => {
 	it('dagger attack: finesse picks the better ability, proficiency and magic add to hit', () => {
 		const dagger = ITEM_TYPES.dagger!;
 		const a = weaponAttack(dagger, { str: 10, dex: 16, con: 10, int: 10, wis: 10, cha: 10 }, 2, true, 0);
-		expect(a).toMatchObject({ bonus: 5, damage: '1d4 + 3', damageType: 'колющий', ability: 'dex' });
+		expect(a).toMatchObject({ bonus: 5, damage: '1d4 + 3', damageType: 'piercing', ability: 'dex' });
 		expect(a.how.at(-1)).toBe('= +5 к атаке');
 		expect(weaponAttack(dagger, { str: 16, dex: 10, con: 10, int: 10, wis: 10, cha: 10 }, 2, false, 1)).toMatchObject({ bonus: 4, ability: 'str', damage: '1d4 + 4' });
 	});
@@ -193,7 +193,7 @@ describe('quick NPC', () => {
 		expect(r.statblock.origin).toBe('adapted');
 		expect(r.statblock.role).toBe('посетитель таверны');
 		expect(r.creature.hpMax).toBe(8);
-		expect(r.statblock.attacks[0]).toMatchObject({ name: 'Кинжал', bonus: 4, damage: '1d4+2', damageType: 'колющий' });
+		expect(r.statblock.attacks[0]).toMatchObject({ name: 'Dagger', bonus: 4, damage: '1d4+2', damageType: 'piercing' });
 		expect(r.items).toHaveLength(1);
 		expect(r.items[0]).toMatchObject({ typeId: 'dagger', equipped: true });
 		expect(resolveItemType(createAdventureState('a', 's', 'r', 'r'), r.items[0]!)?.costCp).toBe(200);
